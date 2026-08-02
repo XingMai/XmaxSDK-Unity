@@ -33,7 +33,7 @@ public sealed class XmaxHost
     {
         _realtime = new XmaxRealtimeManager(apiKey);
 
-        // 尺寸必须与之后传入的宿主帧一致。
+        // 设置 RTC 编码输出尺寸；外部输入帧可以使用不同尺寸，由 RTC 内部裁切。
         await _realtime.ConnectAsync(1280, 720, 30);
 
         _realtime.RemoteFrameReceived += remoteI420Frame =>
@@ -43,12 +43,12 @@ public sealed class XmaxHost
     }
 
     // 由宿主自己的相机/图像处理管线逐帧调用。
-    public void PushProcessedRgba(byte[] rgba, long timestampMicroseconds)
+    public void PushProcessedRgba(byte[] rgba1280x1280, long timestampMicroseconds)
     {
         _realtime.PushRgbaFrame(
-            rgba,
+            rgba1280x1280,
             1280,
-            720,
+            1280,
             timestampMicroseconds,
             1280 * 4);
     }

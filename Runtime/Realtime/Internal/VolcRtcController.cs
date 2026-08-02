@@ -16,6 +16,7 @@ namespace Xmax.SDK
         private const int RemoteDisplayDelayMilliseconds = 300;
         private const int RoomHeartbeatMilliseconds = 10000;
         private const int TaskSeiMilliseconds = 66;
+        private const int VideoTimestampWarning = -202;
 
         private RTCVideo _engine;
         private IRTCVideoRoom _room;
@@ -29,6 +30,7 @@ namespace Xmax.SDK
         private string _botName = string.Empty;
         private string _currentTaskId = string.Empty;
         private RemoteStreamKey? _matchedRemoteStream;
+        private bool _didLogVideoTimestampWarning;
 
         internal event Action<XmaxException> FatalError;
 
@@ -53,6 +55,7 @@ namespace Xmax.SDK
             _roomId = joinInfo.RoomId;
             _localUserId = joinInfo.UserId;
             _botName = joinInfo.BotName ?? string.Empty;
+            _didLogVideoTimestampWarning = false;
             _lifetimeCancellation = new CancellationTokenSource();
 
             try
@@ -117,12 +120,6 @@ namespace Xmax.SDK
                 throw new XmaxException(XmaxErrorCode.RtcError, "RTC room is not joined.");
             }
             frame.Validate();
-            if (frame.Width != _videoFormat.Width || frame.Height != _videoFormat.Height)
-            {
-                throw new XmaxException(
-                    XmaxErrorCode.InvalidConfiguration,
-                    $"Frame size {frame.Width}x{frame.Height} does not match connected format {_videoFormat.Width}x{_videoFormat.Height}.");
-            }
 
             var rtcFrame = new RtcVideoFrame
             {
@@ -142,7 +139,19 @@ namespace Xmax.SDK
                 SupplementaryInfoSize = 0,
                 Matrix = IdentityMatrix()
             };
-            CheckResult(_engine.PushExternalVideoFrame(rtcFrame), "PushExternalVideoFrame");
+            var pushResult = _engine.PushExternalVideoFrame(rtcFrame);
+            if (pushResult == VideoTimestampWarning)
+            {
+                if (!_didLogVideoTimestampWarning)
+                {
+                    _didLogVideoTimestampWarning = true;
+                    Debug.LogWarning(
+                        "[XmaxSDK] RTC reported a video timestamp interval warning; " +
+                        "the frame was accepted and streaming will continue.");
+                }
+                return;
+            }
+            CheckResult(pushResult, "PushExternalVideoFrame");
         }
 
         internal async Task<string> StartGenerationAsync(
