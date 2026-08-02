@@ -25,6 +25,18 @@ namespace Xmax.SDK
             new RealtimeState(RealtimeConnectionState.Idle);
 
         public event Action<RealtimeState> StateChanged;
+        public event Action<XmaxVideoFrame> RemoteFrameReceived;
+
+        public XmaxRealtimeManager(
+            string apiKey,
+            RealtimeModel model = RealtimeModel.X2_0,
+            string baseUrl = XmaxConfiguration.DefaultBaseUrl)
+            : this(
+                new XmaxConfiguration(apiKey, baseUrl),
+                new RealtimeConfiguration(Models.Realtime(model)))
+        {
+            _configuration.Validate();
+        }
 
         internal XmaxRealtimeManager(XmaxConfiguration configuration, RealtimeConfiguration options)
         {
@@ -59,6 +71,7 @@ namespace Xmax.SDK
                 session = await _sessionClient.CreateSessionAsync(Options.Model.Name, connectCancellation.Token);
                 var joinInfo = XmaxSessionClient.RequireJoinInfo(session);
                 var remoteTrack = new RealtimeVideoTrack(joinInfo.BotName);
+                remoteTrack.FrameReceived += HandleRemoteFrame;
                 await _rtcController.JoinAsync(joinInfo, videoFormat, remoteTrack, connectCancellation.Token);
                 connectCancellation.Token.ThrowIfCancellationRequested();
 
@@ -95,6 +108,15 @@ namespace Xmax.SDK
             }
         }
 
+        public Task<RealtimeMediaStream> ConnectAsync(
+            int width,
+            int height,
+            int fps,
+            CancellationToken cancellationToken = default)
+        {
+            return ConnectAsync(new RealtimeVideoFormat(width, height, fps), cancellationToken);
+        }
+
         public void PushVideoFrame(XmaxVideoFrame frame)
         {
             if (frame == null)
@@ -108,6 +130,48 @@ namespace Xmax.SDK
                 throw new XmaxException(XmaxErrorCode.RtcError, "Realtime connection is not open.");
             }
             _rtcController.PushFrame(frame);
+        }
+
+        public void PushRgbaFrame(
+            byte[] rgba,
+            int width,
+            int height,
+            long timestampMicroseconds = 0,
+            int stride = 0,
+            XmaxVideoRotation rotation = XmaxVideoRotation.Rotation0)
+        {
+            PushVideoFrame(XmaxVideoFrame.CreateRgba(
+                rgba,
+                width,
+                height,
+                stride,
+                timestampMicroseconds,
+                rotation));
+        }
+
+        public void PushI420Frame(
+            byte[] y,
+            byte[] u,
+            byte[] v,
+            int width,
+            int height,
+            long timestampMicroseconds = 0,
+            int strideY = 0,
+            int strideU = 0,
+            int strideV = 0,
+            XmaxVideoRotation rotation = XmaxVideoRotation.Rotation0)
+        {
+            PushVideoFrame(XmaxVideoFrame.CreateI420(
+                y,
+                u,
+                v,
+                width,
+                height,
+                strideY,
+                strideU,
+                strideV,
+                timestampMicroseconds,
+                rotation));
         }
 
         public async Task StartGenerationAsync(
@@ -183,6 +247,16 @@ namespace Xmax.SDK
             }
         }
 
+        public Task StartGenerationAsync(
+            string prompt,
+            string referencePath = null,
+            CancellationToken cancellationToken = default)
+        {
+            return StartGenerationAsync(
+                new RealtimeContext(prompt, referencePath),
+                cancellationToken);
+        }
+
         public Task StopGenerationAsync()
         {
             var session = _activeSession;
@@ -206,6 +280,10 @@ namespace Xmax.SDK
             _generationStarting = false;
             var session = _activeSession;
             _activeSession = null;
+            if (_remoteTrack != null)
+            {
+                _remoteTrack.FrameReceived -= HandleRemoteFrame;
+            }
             _remoteTrack = null;
             _currentContext = null;
             await _rtcController.LeaveAsync();
@@ -259,6 +337,10 @@ namespace Xmax.SDK
             var session = _activeSession;
             _activeSession = null;
             _currentContext = null;
+            if (_remoteTrack != null)
+            {
+                _remoteTrack.FrameReceived -= HandleRemoteFrame;
+            }
             _remoteTrack = null;
             await _rtcController.LeaveAsync();
             await TryCloseSessionAsync(session);
@@ -285,6 +367,11 @@ namespace Xmax.SDK
         {
             CurrentState = state;
             StateChanged?.Invoke(state);
+        }
+
+        private void HandleRemoteFrame(XmaxVideoFrame frame)
+        {
+            RemoteFrameReceived?.Invoke(frame);
         }
 
         private static XmaxException AsXmaxException(Exception exception)

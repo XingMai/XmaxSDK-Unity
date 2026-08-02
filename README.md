@@ -28,19 +28,15 @@ using Xmax.SDK;
 public sealed class XmaxHost
 {
     private XmaxRealtimeManager _realtime;
-    private RealtimeMediaStream _remoteStream;
 
     public async Task ConnectAsync(string apiKey)
     {
-        var client = new XmaxClient(new XmaxConfiguration(apiKey));
-        _realtime = client.CreateRealtimeManager(
-            new RealtimeConfiguration(Models.Realtime(RealtimeModel.X2_0)));
+        _realtime = new XmaxRealtimeManager(apiKey);
 
         // 尺寸必须与之后传入的宿主帧一致。
-        _remoteStream = await _realtime.ConnectAsync(
-            new RealtimeVideoFormat(1280, 720, 30));
+        await _realtime.ConnectAsync(1280, 720, 30);
 
-        _remoteStream.VideoTrack.FrameReceived += remoteI420Frame =>
+        _realtime.RemoteFrameReceived += remoteI420Frame =>
         {
             // 宿主在这里将远端 I420 帧上传到纹理或交给自己的渲染管线。
         };
@@ -49,18 +45,17 @@ public sealed class XmaxHost
     // 由宿主自己的相机/图像处理管线逐帧调用。
     public void PushProcessedRgba(byte[] rgba, long timestampMicroseconds)
     {
-        var frame = XmaxVideoFrame.CreateRgba(
+        _realtime.PushRgbaFrame(
             rgba,
             1280,
             720,
-            1280 * 4,
-            timestampMicroseconds);
-        _realtime.PushVideoFrame(frame);
+            timestampMicroseconds,
+            1280 * 4);
     }
 
     public Task StartGenerationAsync(string prompt)
     {
-        return _realtime.StartGenerationAsync(new RealtimeContext(prompt));
+        return _realtime.StartGenerationAsync(prompt);
     }
 
     public Task StopGenerationAsync() => _realtime.StopGenerationAsync();
