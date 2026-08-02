@@ -1,0 +1,14 @@
+{
+  "name": "ai.xmax.sdk",
+  "displayName": "XmaxSDK",
+  "version": "0.1.0",
+  "unity": "6000.0",
+  "description": "Reusable RTC capabilities for Xmax Unity applications.",
+  "author": {
+    "name": "Xmax"
+  },
+  "keywords": [
+    "xmax",
+    "rtc"
+  ]
+}

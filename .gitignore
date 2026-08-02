@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# IDE files
+.idea/
+.vscode/
+.vs/
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+
+# Unity-generated directories (if this package is opened as a project)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Ll]ogs/
+[Uu]serSettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Local build outputs and exported package archives
+[Bb]uild/
+[Bb]uilds/
+*.unitypackage
+*.tgz
+
+# Crash and diagnostic files
+sysinfo.txt
