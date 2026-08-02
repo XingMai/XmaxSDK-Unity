@@ -1,4 +1,7 @@
 {
   "name": "Xmax.SDK",
-  "rootNamespace": "Xmax.SDK"
+  "rootNamespace": "Xmax.SDK",
+  "references": [
+    "Xmax.VolcEngineRTC"
+  ]
 }

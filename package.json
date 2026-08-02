@@ -3,7 +3,7 @@
   "displayName": "XmaxSDK",
   "version": "0.1.0",
   "unity": "6000.0",
-  "description": "Reusable RTC capabilities for Xmax Unity applications.",
+  "description": "Xmax realtime video SDK with host-provided video input and VolcEngine RTC transport.",
   "author": {
     "name": "Xmax"
   },
