@@ -57,6 +57,27 @@ namespace Xmax.SDK
             });
         }
 
+        internal static string Tracks(
+            string userId,
+            string taskId,
+            IReadOnlyList<XmaxTrackPoint> tracks)
+        {
+            var serializedTracks = new List<int[]>(tracks.Count);
+            for (var index = 0; index < tracks.Count; index++)
+            {
+                serializedTracks.Add(new[] { tracks[index].X, tracks[index].Y });
+            }
+
+            return JsonMapper.ToJson(new Dictionary<string, object>
+            {
+                ["event"] = "tracks",
+                ["user_id"] = userId,
+                ["uid"] = taskId,
+                ["session_uid"] = taskId,
+                ["tracks"] = serializedTracks
+            });
+        }
+
         private static Dictionary<string, object> Parameters(
             RealtimeVideoFormat videoFormat,
             RealtimeContext context,

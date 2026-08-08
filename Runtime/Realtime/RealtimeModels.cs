@@ -84,6 +84,18 @@ namespace Xmax.SDK
         }
     }
 
+    public readonly struct XmaxTrackPoint
+    {
+        public int X { get; }
+        public int Y { get; }
+
+        public XmaxTrackPoint(int x, int y)
+        {
+            X = x;
+            Y = y;
+        }
+    }
+
     public enum RealtimeConnectionState
     {
         Idle,

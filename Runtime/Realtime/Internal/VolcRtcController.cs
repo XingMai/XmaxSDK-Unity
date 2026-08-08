@@ -202,6 +202,16 @@ namespace Xmax.SDK
             SendRoomMessage(RtcRoomEvent.ChangeCondition(_localUserId, videoFormat, context));
         }
 
+        internal void SendTracks(IReadOnlyList<XmaxTrackPoint> tracks, string taskId)
+        {
+            if (_room == null || string.IsNullOrEmpty(_localUserId) ||
+                string.IsNullOrEmpty(taskId) || _currentTaskId != taskId)
+            {
+                throw new XmaxException(XmaxErrorCode.RtcError, "Realtime generation task does not match.");
+            }
+            SendRoomMessage(RtcRoomEvent.Tracks(_localUserId, taskId, tracks));
+        }
+
         internal void StopGeneration()
         {
             var taskId = _currentTaskId;

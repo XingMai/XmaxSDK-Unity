@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -172,6 +173,41 @@ namespace Xmax.SDK
                 strideV,
                 timestampMicroseconds,
                 rotation));
+        }
+
+        public void SendTracks(IReadOnlyList<XmaxTrackPoint> tracks)
+        {
+            if (tracks == null)
+            {
+                throw new ArgumentNullException(nameof(tracks));
+            }
+            if (tracks.Count == 0)
+            {
+                return;
+            }
+            if (_activeSession == null ||
+                CurrentState.ConnectionState != RealtimeConnectionState.Generating ||
+                string.IsNullOrEmpty(CurrentState.TaskId))
+            {
+                throw new XmaxException(
+                    XmaxErrorCode.RtcError,
+                    "Tracks can only be sent while realtime generation is active.");
+            }
+
+            for (var index = 0; index < tracks.Count; index++)
+            {
+                var point = tracks[index];
+                if (point.X < 0 || point.X >= _videoFormat.Width ||
+                    point.Y < 0 || point.Y >= _videoFormat.Height)
+                {
+                    throw new XmaxException(
+                        XmaxErrorCode.InvalidConfiguration,
+                        $"Track point ({point.X}, {point.Y}) is outside the video bounds " +
+                        $"0..{_videoFormat.Width - 1}, 0..{_videoFormat.Height - 1}.");
+                }
+            }
+
+            _rtcController.SendTracks(tracks, CurrentState.TaskId);
         }
 
         public async Task StartGenerationAsync(
