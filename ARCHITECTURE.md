@@ -36,6 +36,8 @@ flowchart TD
 
 目录按职责组织，发布包仍使用 `Xmax.SDK` 单个业务程序集，避免拆程序集破坏现有消费者。原生厂商类型只出现在 `Foundation/RTC` 和 `ThirdParty`；厂商 JSON 类型只出现在 `Foundation/Serialization` 和 `ThirdParty`。Service、Stream 和 Core 通过接口及 SDK 自有模型协作。
 
+远端流标识与 iOS 统一为 `Foundation/RTC/RemoteStream`，由房间和用户组成，表示远端主流。原生流索引的过滤与转换由 RTC 适配层负责。
+
 ## 生命周期契约
 
 Unity 主线程承担 iOS actor / MainActor 的串行执行职责。协调器在发出事件前登记操作，每次异步等待后检查取消。公开 API 不会自动切换任意调用线程；应用在 Unity 主线程创建并使用 Manager。

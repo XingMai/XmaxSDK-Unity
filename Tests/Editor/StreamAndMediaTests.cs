@@ -21,7 +21,7 @@ namespace Xmax.SDK.Tests
                 stream.FrameReceived += frame => frames++;
                 var start = stream.StartGenerationAsync(new RealtimeContext("prompt"), Format, CancellationToken.None);
                 rtc.Sei("old-task"); rtc.Frame();
-                rtc.Sei("test-task", new RtcStreamKey("room", "other"));
+                rtc.Sei("test-task", new RemoteStream("room", "other"));
                 Assert.False(start.IsCompleted);
                 Assert.AreEqual(0, frames);
                 rtc.Sei("test-task");

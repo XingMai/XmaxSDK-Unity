@@ -21,10 +21,10 @@ namespace Xmax.SDK
         private bool _didLogVideoTimestampWarning;
         public event Action<XmaxException> FatalError;
         public event Action<RealtimeNetworkQuality> NetworkQualityChanged;
-        public event Action<RtcStreamKey> VideoPublished;
-        public event Action<RtcStreamKey> VideoUnpublished;
-        public event Action<RtcStreamKey, byte[]> SeiReceived;
-        public event Action<RtcStreamKey, XmaxVideoFrame> FrameReceived;
+        public event Action<RemoteStream> VideoPublished;
+        public event Action<RemoteStream> VideoUnpublished;
+        public event Action<RemoteStream, byte[]> SeiReceived;
+        public event Action<RemoteStream, XmaxVideoFrame> FrameReceived;
         public void ValidatePlatform()
         {
             if (Application.platform != RuntimePlatform.Android)
@@ -264,13 +264,13 @@ namespace Xmax.SDK
 
         private void OnUserPublishStream(string roomId, string userId, MediaStreamType type)
         {
-            if (roomId == _roomId && IsVideo(type)) VideoPublished?.Invoke(new RtcStreamKey(roomId, userId));
+            if (roomId == _roomId && IsVideo(type)) VideoPublished?.Invoke(new RemoteStream(roomId, userId));
         }
         private void OnUserUnpublishStream(string roomId, string userId, MediaStreamType type, StreamRemoveReason reason)
         {
-            if (roomId == _roomId && IsVideo(type)) VideoUnpublished?.Invoke(new RtcStreamKey(roomId, userId));
+            if (roomId == _roomId && IsVideo(type)) VideoUnpublished?.Invoke(new RemoteStream(roomId, userId));
         }
-        public void SubscribeVideo(RtcStreamKey key)
+        public void SubscribeVideo(RemoteStream key)
         {
             if (_engine == null || _room == null || key.RoomId != _roomId) return;
             _engine.SetRemoteVideoSink(ToNative(key), VideoSinkPixelFormat.kI420);
@@ -278,11 +278,13 @@ namespace Xmax.SDK
         }
         private void OnSeiMessageReceived(RemoteStreamKey key, byte[] buffer)
         {
-            if (_engine != null && key.RoomID == _roomId) SeiReceived?.Invoke(FromNative(key), buffer);
+            if (_engine != null && key.RoomID == _roomId && key.streamIndex == StreamIndex.kStreamIndexMain)
+                SeiReceived?.Invoke(FromNative(key), buffer);
         }
         private bool OnRemoteVideoFrame(RemoteStreamKey key, RtcVideoFrame frame)
         {
-            if (_engine == null || key.RoomID != _roomId || frame.PixelFormat != VideoPixelFormat.kVideoPixelFormatI420 || frame.NumberOfPlanes < 3) return true;
+            if (_engine == null || key.RoomID != _roomId || key.streamIndex != StreamIndex.kStreamIndexMain ||
+                frame.PixelFormat != VideoPixelFormat.kVideoPixelFormatI420 || frame.NumberOfPlanes < 3) return true;
             try
             {
                 var converted = XmaxVideoFrame.CreateI420(frame.PlaneData[0], frame.PlaneData[1], frame.PlaneData[2],
@@ -297,8 +299,8 @@ namespace Xmax.SDK
         {
             CheckResult(_engine?.SendSEIMessage(data, data.Length, (int)StreamIndex.kStreamIndexMain, 1, 0) ?? -1, "SendSEIMessage");
         }
-        private static RtcStreamKey FromNative(RemoteStreamKey key) => new RtcStreamKey(key.RoomID, key.UserID, (int)key.streamIndex);
-        private static RemoteStreamKey ToNative(RtcStreamKey key) => new RemoteStreamKey { RoomID = key.RoomId, UserID = key.UserId, streamIndex = (StreamIndex)key.Index };
+        private static RemoteStream FromNative(RemoteStreamKey key) => new RemoteStream(key.RoomID, key.UserID);
+        private static RemoteStreamKey ToNative(RemoteStream key) => new RemoteStreamKey { RoomID = key.RoomId, UserID = key.UserId, streamIndex = StreamIndex.kStreamIndexMain };
         public void SendRoomMessage(string message)
         {
             if (_room == null)

@@ -19,7 +19,7 @@ namespace Xmax.SDK
         private Task _sei = Task.CompletedTask;
         private TaskCompletionSource<bool> _confirmation;
         private string _taskId;
-        private RtcStreamKey? _matchedStream;
+        private RemoteStream? _matchedStream;
         public event Action<XmaxException> FatalError;
         public event Action<RealtimeNetworkQuality> NetworkQualityChanged;
         public event Action<XmaxVideoFrame> FrameReceived;
@@ -106,19 +106,19 @@ namespace Xmax.SDK
                 catch (Exception exception) { UnityEngine.Debug.LogWarning("[XmaxSDK] Stop signal failed: " + exception.Message); }
             }
         }
-        private bool Accept(RtcStreamKey key) => _info != null && key.RoomId == _info.RoomId && key.Index == 0 &&
+        private bool Accept(RemoteStream key) => _info != null && key.RoomId == _info.RoomId &&
             (string.IsNullOrEmpty(_info.BotName) || key.UserId == _info.BotName);
-        private void OnPublished(RtcStreamKey key)
+        private void OnPublished(RemoteStream key)
         {
             if (!Accept(key)) return;
             try { _rtc.SubscribeVideo(key); }
             catch (Exception exception) { OnFatalError(RealtimeErrorHandler.Wrap(exception)); }
         }
-        private void OnUnpublished(RtcStreamKey key)
+        private void OnUnpublished(RemoteStream key)
         {
             if (_matchedStream.HasValue && _matchedStream.Value.Equals(key)) _matchedStream = null;
         }
-        private void OnSei(RtcStreamKey key, byte[] data)
+        private void OnSei(RemoteStream key, byte[] data)
         {
             if (_taskId == null || !Accept(key)) return;
             var message = Encoding.UTF8.GetString(data ?? Array.Empty<byte>()).Trim('\0', ' ', '\r', '\n', '\t');
@@ -127,7 +127,7 @@ namespace Xmax.SDK
             _matchedStream = key;
             _confirmation?.TrySetResult(true);
         }
-        private void OnFrame(RtcStreamKey key, XmaxVideoFrame frame)
+        private void OnFrame(RemoteStream key, XmaxVideoFrame frame)
         {
             if (_taskId == null || !_matchedStream.HasValue || !_matchedStream.Value.Equals(key)) return;
             EventDispatch.Raise(FrameReceived, frame);

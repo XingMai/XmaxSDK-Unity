@@ -81,23 +81,23 @@ namespace Xmax.SDK.Tests
     {
         public event Action<XmaxException> FatalError;
         public event Action<RealtimeNetworkQuality> NetworkQualityChanged;
-        public event Action<RtcStreamKey> VideoPublished;
-        public event Action<RtcStreamKey> VideoUnpublished;
-        public event Action<RtcStreamKey, byte[]> SeiReceived;
-        public event Action<RtcStreamKey, XmaxVideoFrame> FrameReceived;
+        public event Action<RemoteStream> VideoPublished;
+        public event Action<RemoteStream> VideoUnpublished;
+        public event Action<RemoteStream, byte[]> SeiReceived;
+        public event Action<RemoteStream, XmaxVideoFrame> FrameReceived;
         internal readonly List<string> Messages = new List<string>();
         internal bool RejectSei;
         internal int Subscriptions;
-        internal static RtcStreamKey Bot => new RtcStreamKey("room", "bot");
+        internal static RemoteStream Bot => new RemoteStream("room", "bot");
         public void ValidatePlatform() { }
         public Task JoinAsync(RtcJoinInfo info, RealtimeVideoFormat format, CancellationToken token) => Task.CompletedTask;
         public Task LeaveAsync() => Task.CompletedTask;
-        public void SubscribeVideo(RtcStreamKey key) { Subscriptions++; }
+        public void SubscribeVideo(RemoteStream key) { Subscriptions++; }
         public void PushFrame(XmaxVideoFrame frame) { }
         public void SendRoomMessage(string message) { Messages.Add(message); }
         public void SendSei(byte[] data) { if (RejectSei) throw new XmaxException(XmaxErrorCode.RtcError, "SEI failed."); }
-        internal void Sei(string id, RtcStreamKey? key = null) => SeiReceived?.Invoke(key ?? Bot, System.Text.Encoding.UTF8.GetBytes(id));
-        internal void Frame(RtcStreamKey? key = null) => FrameReceived?.Invoke(key ?? Bot, AsyncTest.Frame());
+        internal void Sei(string id, RemoteStream? key = null) => SeiReceived?.Invoke(key ?? Bot, System.Text.Encoding.UTF8.GetBytes(id));
+        internal void Frame(RemoteStream? key = null) => FrameReceived?.Invoke(key ?? Bot, AsyncTest.Frame());
         internal void Publish() => VideoPublished?.Invoke(Bot);
         internal void Unpublish() => VideoUnpublished?.Invoke(Bot);
         internal void Fail() => FatalError?.Invoke(new XmaxException(XmaxErrorCode.RtcError, "RTC failed."));
