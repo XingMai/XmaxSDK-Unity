@@ -10,12 +10,15 @@ namespace Xmax.SDK
         private readonly IStreamController _stream;
         private readonly RenderController _render;
         private readonly SessionHeartbeat _heartbeat;
+        private readonly RealtimeTiming _timing;
         internal XmaxSession ActiveSession { get; private set; }
+        internal RealtimeMediaStream CurrentRemoteStream { get; private set; }
         internal event Action<XmaxException> FatalError;
         internal event Action<XmaxException> CleanupError;
-        internal XmaxRealtimeConnectionManager(IRealtimeSessionService sessions, IStreamController stream, RenderController render)
+        internal XmaxRealtimeConnectionManager(IRealtimeSessionService sessions, IStreamController stream, RenderController render, RealtimeTiming timing = null)
         {
             _sessions = sessions; _stream = stream; _render = render;
+            _timing = timing;
             _heartbeat = new SessionHeartbeat(sessions);
             _heartbeat.Failed += exception => EventDispatch.Raise(FatalError, exception);
         }
@@ -25,16 +28,20 @@ namespace Xmax.SDK
             XmaxSession session = null;
             try
             {
+                _timing?.Mark("session-start");
                 session = await _sessions.CreateSessionAsync(model, token);
+                _timing?.Mark("session-end");
                 token.ThrowIfCancellationRequested();
                 var info = RealtimeSessionService.RequireJoinInfo(session);
                 var track = new RealtimeVideoTrack(info.BotName);
                 _render.Bind(track);
+                _timing?.Mark("room-start");
                 await _stream.ConnectAsync(info, format, token);
+                _timing?.Mark("room-end");
                 token.ThrowIfCancellationRequested();
                 ActiveSession = session;
                 _heartbeat.Start(session.SessionUid);
-                return new RealtimeMediaStream(RealtimeStreamId.Remote, track);
+                return CurrentRemoteStream = new RealtimeMediaStream(RealtimeStreamId.Remote, track);
             }
             catch
             {
@@ -48,6 +55,7 @@ namespace Xmax.SDK
         {
             var session = ActiveSession;
             ActiveSession = null;
+            CurrentRemoteStream = null;
             _render.Reset();
             try
             {
@@ -60,7 +68,11 @@ namespace Xmax.SDK
         {
             if (session == null || string.IsNullOrEmpty(session.SessionUid)) return;
             try { await _sessions.CloseSessionAsync(session.SessionUid, CancellationToken.None); }
-            catch (Exception exception) { EventDispatch.Raise(CleanupError, RealtimeErrorHandler.Wrap(exception)); }
+            catch (Exception exception)
+            {
+                XmaxLogger.Failure("Session", exception);
+                EventDispatch.Raise(CleanupError, RealtimeErrorHandler.Wrap(exception));
+            }
         }
     }
 }

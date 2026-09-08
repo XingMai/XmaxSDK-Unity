@@ -11,15 +11,17 @@ namespace Xmax.SDK
 
         public string ApiKey { get; }
         public string BaseUrl { get; }
+        public XmaxLoggerOption LoggerOptions { get; }
 
-        public XmaxConfiguration(string apiKey, XmaxEnvironment environment)
+        public XmaxConfiguration(string apiKey, XmaxEnvironment environment, XmaxLoggerOption loggerOptions = XmaxLoggerOption.None)
             : this(apiKey, environment == XmaxEnvironment.China ? DefaultBaseUrl :
-                environment == XmaxEnvironment.Global ? GlobalBaseUrl : throw new ArgumentOutOfRangeException(nameof(environment))) { }
+                environment == XmaxEnvironment.Global ? GlobalBaseUrl : throw new ArgumentOutOfRangeException(nameof(environment)), loggerOptions) { }
 
-        public XmaxConfiguration(string apiKey, string baseUrl = DefaultBaseUrl)
+        public XmaxConfiguration(string apiKey, string baseUrl = DefaultBaseUrl, XmaxLoggerOption loggerOptions = XmaxLoggerOption.None)
         {
             ApiKey = (apiKey ?? string.Empty).Trim();
             BaseUrl = (baseUrl ?? string.Empty).Trim().TrimEnd('/');
+            LoggerOptions = loggerOptions;
         }
 
         internal void Validate()

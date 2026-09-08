@@ -12,6 +12,8 @@ namespace Xmax.SDK
         private readonly IRtcManager _rtc;
         private readonly int _generationTimeout;
         private readonly Func<string> _taskIdFactory;
+        private readonly RealtimeTiming _timing;
+        private readonly QualityController _quality;
         private RtcJoinInfo _info;
         private CancellationTokenSource _roomCancellation;
         private CancellationTokenSource _generationCancellation;
@@ -24,13 +26,15 @@ namespace Xmax.SDK
         public event Action<RealtimeNetworkQuality> NetworkQualityChanged;
         public event Action<XmaxVideoFrame> FrameReceived;
 
-        internal StreamController(IRtcManager rtc, int generationTimeout = 30000, Func<string> taskIdFactory = null)
+        internal StreamController(IRtcManager rtc, int generationTimeout = 30000, Func<string> taskIdFactory = null, RealtimeTiming timing = null)
         {
             _rtc = rtc;
+            _timing = timing;
+            _quality = new QualityController(rtc);
             _generationTimeout = generationTimeout;
             _taskIdFactory = taskIdFactory ?? (() => "task-unity-" + Guid.NewGuid().ToString("N"));
             rtc.FatalError += OnFatalError;
-            rtc.NetworkQualityChanged += quality => { if (_info != null) EventDispatch.Raise(NetworkQualityChanged, quality); };
+            _quality.NetworkQualityChanged += quality => { if (_info != null) EventDispatch.Raise(NetworkQualityChanged, quality); };
             rtc.VideoPublished += OnPublished;
             rtc.VideoUnpublished += OnUnpublished;
             rtc.SeiReceived += OnSei;
@@ -71,7 +75,10 @@ namespace Xmax.SDK
             _generationCancellation = CancellationTokenSource.CreateLinkedTokenSource(_roomCancellation.Token);
             try
             {
+                _timing?.BeginSignal(taskId);
                 _rtc.SendRoomMessage(RtcRoomEvent.Start(_info.UserId, taskId, format, context));
+                _timing?.SignalSent(taskId);
+                XmaxLogger.Info("Room", () => "Generation start signal sent.");
                 _sei = RunSeiAsync(taskId, _generationCancellation.Token);
                 await AsyncDeadline.WaitAsync(_confirmation.Task, _generationTimeout, cancellationToken);
                 return taskId;
@@ -103,7 +110,7 @@ namespace Xmax.SDK
             if (taskId != null && _info != null)
             {
                 try { _rtc.SendRoomMessage(RtcRoomEvent.Stop(_info.UserId, taskId)); }
-                catch (Exception exception) { UnityEngine.Debug.LogWarning("[XmaxSDK] Stop signal failed: " + exception.Message); }
+                catch (Exception exception) { XmaxLogger.Failure("Room", exception); }
             }
         }
         private bool Accept(RemoteStream key) => _info != null && key.RoomId == _info.RoomId &&
@@ -123,6 +130,7 @@ namespace Xmax.SDK
             if (_taskId == null || !Accept(key)) return;
             var message = Encoding.UTF8.GetString(data ?? Array.Empty<byte>()).Trim('\0', ' ', '\r', '\n', '\t');
             if (message != _taskId) return;
+            _timing?.MatchSei(_taskId);
             // Rebind after unpublish/republish, even when initial confirmation completed.
             _matchedStream = key;
             _confirmation?.TrySetResult(true);

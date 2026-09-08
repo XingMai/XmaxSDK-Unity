@@ -22,33 +22,44 @@ namespace Xmax.SDK
             CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using (var request = new UnityWebRequest(_configuration.BaseUrl + path, method))
+            _configuration.Validate();
+            var elapsed = System.Diagnostics.Stopwatch.StartNew();
+            try
             {
-                request.downloadHandler = new DownloadHandlerBuffer();
-                if (body != null)
+                using (var request = new UnityWebRequest(_configuration.BaseUrl + path, method))
                 {
-                    request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
-                }
-                request.timeout = TimeoutSeconds;
-                request.SetRequestHeader("Accept", "application/json");
-                request.SetRequestHeader("Content-Type", "application/json");
-                request.SetRequestHeader("X-Api-Key", _configuration.ApiKey);
-
-                var operation = request.SendWebRequest();
-                while (!operation.isDone)
-                {
-                    if (cancellationToken.IsCancellationRequested)
+                    request.downloadHandler = new DownloadHandlerBuffer();
+                    if (body != null)
                     {
-                        request.Abort();
-                        cancellationToken.ThrowIfCancellationRequested();
+                        request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
                     }
-                    await Task.Yield();
-                }
+                    request.timeout = TimeoutSeconds;
+                    request.SetRequestHeader("Accept", "application/json");
+                    request.SetRequestHeader("Content-Type", "application/json");
+                    request.SetRequestHeader("X-Api-Key", _configuration.ApiKey);
 
-                cancellationToken.ThrowIfCancellationRequested();
-                return ParseEnvelope(request.downloadHandler?.text ?? string.Empty,
-                    request.responseCode, request.result == UnityWebRequest.Result.ConnectionError,
-                    request.error, method == "DELETE");
+                    var operation = request.SendWebRequest();
+                    while (!operation.isDone)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            request.Abort();
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
+                        await Task.Yield();
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    ApiLogger.Response(method, path, request.responseCode, (long)request.downloadedBytes, elapsed.ElapsedMilliseconds);
+                    return ParseEnvelope(request.downloadHandler?.text ?? string.Empty,
+                        request.responseCode, request.result == UnityWebRequest.Result.ConnectionError,
+                        request.error, method == "DELETE");
+                }
+            }
+            catch (Exception exception)
+            {
+                ApiLogger.Failure(method, path, exception, elapsed.ElapsedMilliseconds);
+                throw;
             }
         }
 

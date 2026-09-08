@@ -11,13 +11,13 @@ namespace Xmax.SDK
                 XmaxErrorCode.InvalidConfiguration,
                 "Xmax configuration is required.");
             _api = new ApiService(Configuration);
+            XmaxLogger.Configure(Configuration.LoggerOptions);
         }
 
         public XmaxRealtimeManager CreateRealtimeManager(RealtimeConfiguration options)
         {
-            Configuration.Validate();
             return new XmaxRealtimeManager(Configuration, options,
-                new RealtimeSessionService(_api), new StreamController(new RtcManager()));
+                new RealtimeSessionService(_api), null);
         }
 
         public MediaService CreateMediaService() => new MediaService();

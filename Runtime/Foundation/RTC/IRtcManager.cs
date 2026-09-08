@@ -8,7 +8,7 @@ namespace Xmax.SDK
     internal interface IRtcManager
     {
         event Action<XmaxException> FatalError;
-        event Action<RealtimeNetworkQuality> NetworkQualityChanged;
+        event Action<RtcNetworkQuality> NetworkQualityChanged;
         event Action<RemoteStream> VideoPublished;
         event Action<RemoteStream> VideoUnpublished;
         event Action<RemoteStream, byte[]> SeiReceived;

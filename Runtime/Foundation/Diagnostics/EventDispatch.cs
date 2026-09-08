@@ -12,7 +12,7 @@ namespace Xmax.SDK
             {
                 if (isCurrent != null && !isCurrent()) break;
                 try { handler(value); }
-                catch (Exception exception) { UnityEngine.Debug.LogException(exception); }
+                catch (Exception exception) { XmaxLogger.Failure("Callback", exception); }
             }
         }
     }

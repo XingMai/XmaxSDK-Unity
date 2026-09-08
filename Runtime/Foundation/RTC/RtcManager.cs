@@ -20,7 +20,7 @@ namespace Xmax.SDK
         private string _localUserId = string.Empty;
         private bool _didLogVideoTimestampWarning;
         public event Action<XmaxException> FatalError;
-        public event Action<RealtimeNetworkQuality> NetworkQualityChanged;
+        public event Action<RtcNetworkQuality> NetworkQualityChanged;
         public event Action<RemoteStream> VideoPublished;
         public event Action<RemoteStream> VideoUnpublished;
         public event Action<RemoteStream, byte[]> SeiReceived;
@@ -135,8 +135,8 @@ namespace Xmax.SDK
                 if (!_didLogVideoTimestampWarning)
                 {
                     _didLogVideoTimestampWarning = true;
-                    Debug.LogWarning(
-                        "[XmaxSDK] RTC reported a video timestamp interval warning; " +
+                    XmaxLogger.Warning("RTC",
+                        "RTC reported a video timestamp interval warning; " +
                         "the frame was accepted and streaming will continue.");
                 }
                 return;
@@ -209,7 +209,7 @@ namespace Xmax.SDK
         private void OnNetworkQuality(string roomId, NetworkQualityStats local, List<NetworkQualityStats> remote, int count)
         {
             if (_room != null && roomId == _roomId)
-                EventDispatch.Raise(NetworkQualityChanged, new RealtimeNetworkQuality(local.fraction_lost, local.rtt, local.total_bandwidth));
+                EventDispatch.Raise(NetworkQualityChanged, RtcQualityConverter.Convert(local));
         }
 
         private void OnEngineError(int error)
@@ -292,7 +292,7 @@ namespace Xmax.SDK
                     frame.TimestampUs, (XmaxVideoRotation)(int)frame.Rotation);
                 FrameReceived?.Invoke(FromNative(key), converted);
             }
-            catch (Exception exception) { Debug.LogException(exception); }
+            catch (Exception exception) { XmaxLogger.Failure("RTC", exception); }
             return true;
         }
         public void SendSei(byte[] data)

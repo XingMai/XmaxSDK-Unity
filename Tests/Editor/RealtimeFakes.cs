@@ -80,7 +80,7 @@ namespace Xmax.SDK.Tests
     internal sealed class FakeRtc : IRtcManager
     {
         public event Action<XmaxException> FatalError;
-        public event Action<RealtimeNetworkQuality> NetworkQualityChanged;
+        public event Action<RtcNetworkQuality> NetworkQualityChanged;
         public event Action<RemoteStream> VideoPublished;
         public event Action<RemoteStream> VideoUnpublished;
         public event Action<RemoteStream, byte[]> SeiReceived;
@@ -101,6 +101,7 @@ namespace Xmax.SDK.Tests
         internal void Publish() => VideoPublished?.Invoke(Bot);
         internal void Unpublish() => VideoUnpublished?.Invoke(Bot);
         internal void Fail() => FatalError?.Invoke(new XmaxException(XmaxErrorCode.RtcError, "RTC failed."));
-        internal void Quality() => NetworkQualityChanged?.Invoke(new RealtimeNetworkQuality(0, 0, 0));
+        internal void Quality(RtcNetworkQuality? quality = null) => NetworkQualityChanged?.Invoke(quality ??
+            new RtcNetworkQuality(RtcQualityLevel.Good, RtcQualityLevel.Poor, 0.02, 30, 100000));
     }
 }

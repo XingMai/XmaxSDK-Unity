@@ -21,6 +21,8 @@ namespace Xmax.SDK
         void PushVideoFrame(XmaxVideoFrame frame);
         void SendTracks(IReadOnlyList<XmaxTrackPoint> tracks);
         Task StartGenerationAsync(RealtimeContext context = null, CancellationToken cancellationToken = default);
+        Task<RealtimeMediaStream> StartGenerationAsync(RealtimeMediaStream localStream, RealtimeContext context,
+            CancellationToken cancellationToken = default);
         Task StopGenerationAsync();
         Task DisconnectAsync();
         Task CloseAsync();

@@ -15,6 +15,7 @@ namespace Xmax.SDK
         private readonly MediaController _media;
         private readonly InteractionController _interaction;
         private readonly RenderController _render;
+        private readonly RealtimeTiming _timing;
         private RealtimeVideoFormat _videoFormat;
         private Task _failureCleanup = Task.CompletedTask;
 
@@ -34,22 +35,23 @@ namespace Xmax.SDK
         public event Action<RealtimeNetworkQuality> NetworkQualityChanged;
 
         public XmaxRealtimeManager(string apiKey, RealtimeModel model = RealtimeModel.X2_0,
-            string baseUrl = XmaxConfiguration.DefaultBaseUrl)
-            : this(new XmaxConfiguration(apiKey, baseUrl), new RealtimeConfiguration(Models.Realtime(model))) { }
+            string baseUrl = XmaxConfiguration.DefaultBaseUrl, XmaxLoggerOption loggerOptions = XmaxLoggerOption.None)
+            : this(new XmaxConfiguration(apiKey, baseUrl, loggerOptions), new RealtimeConfiguration(Models.Realtime(model))) { }
 
         internal XmaxRealtimeManager(XmaxConfiguration configuration, RealtimeConfiguration options)
             : this(configuration, options, new RealtimeSessionService(new ApiService(configuration)),
-                new StreamController(new RtcManager())) { }
+                null) { }
 
         internal XmaxRealtimeManager(XmaxConfiguration configuration, RealtimeConfiguration options,
-            IRealtimeSessionService sessions, IStreamController stream)
+            IRealtimeSessionService sessions, IStreamController stream, RealtimeTiming timing = null)
         {
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-            configuration.Validate();
+            XmaxLogger.Configure(configuration.LoggerOptions);
             Options = options ?? throw new ArgumentNullException(nameof(options));
-            _stream = stream ?? throw new ArgumentNullException(nameof(stream));
+            _timing = timing ?? new RealtimeTiming();
+            _stream = stream = stream ?? new StreamController(new RtcManager(), timing: _timing);
             var render = _render = new RenderController();
-            _connection = new XmaxRealtimeConnectionManager(sessions, stream, render);
+            _connection = new XmaxRealtimeConnectionManager(sessions, stream, render, _timing);
             _generation = new XmaxRealtimeGenerationManager(stream, render);
             _media = new MediaController(_coordinator.RequireThread, PublishLocalFrame);
             _interaction = new InteractionController(stream);
@@ -87,29 +89,37 @@ namespace Xmax.SDK
             _configuration.Validate();
             using (var operation = _coordinator.Begin(RealtimeOperation.Connection, cancellationToken))
             {
-                try
-                {
-                    _stream.ValidatePlatform();
-                    if (createSource) _media.CreateExternalStream(format);
-                    _videoFormat = format;
-                    _generation.ResetContext();
-                    EmitState(new RealtimeState(RealtimeConnectionState.Connecting));
-                    operation.EnsureCurrent();
-                    var remote = await _connection.ConnectAsync(Options.Model.Name, format, operation.Token);
-                    operation.EnsureCurrent();
-                    EmitState(new RealtimeState(RealtimeConnectionState.Connected, _connection.ActiveSession.SessionUid));
-                    operation.EnsureCurrent();
-                    return remote;
-                }
-                catch (Exception exception)
-                {
-                    // A state listener may cancel immediately after the connection commits.
-                    if (_connection.ActiveSession != null) await _connection.DisconnectAsync();
-                    if (!_coordinator.IsTerminating)
-                        EmitState(new RealtimeState(exception is OperationCanceledException ? RealtimeConnectionState.Disconnected : RealtimeConnectionState.Error));
-                    if (exception is OperationCanceledException) throw;
-                    throw RealtimeErrorHandler.Wrap(exception);
-                }
+                return await PerformConnectAsync(format, createSource, operation);
+            }
+        }
+        private async Task<RealtimeMediaStream> PerformConnectAsync(RealtimeVideoFormat format, bool createSource, RealtimeCoordinator.Operation operation)
+        {
+            try
+            {
+                _configuration.Validate();
+                _stream.ValidatePlatform();
+                if (createSource) _media.CreateExternalStream(format);
+                _videoFormat = format;
+                _generation.ResetContext();
+                _timing.Mark("connection-start");
+                EmitState(new RealtimeState(RealtimeConnectionState.Connecting));
+                operation.EnsureCurrent();
+                var remote = await _connection.ConnectAsync(Options.Model.Name, format, operation.Token);
+                operation.EnsureCurrent();
+                _timing.Mark("connection-end");
+                EmitState(new RealtimeState(RealtimeConnectionState.Connected, _connection.ActiveSession.SessionUid));
+                operation.EnsureCurrent();
+                return remote;
+            }
+            catch (Exception exception)
+            {
+                // A state listener may cancel immediately after the connection commits.
+                if (_connection.ActiveSession != null) await _connection.DisconnectAsync();
+                if (!_coordinator.IsTerminating)
+                    EmitState(new RealtimeState(exception is OperationCanceledException ? RealtimeConnectionState.Disconnected : RealtimeConnectionState.Error));
+                XmaxLogger.Failure("Connection", exception);
+                if (exception is OperationCanceledException) throw;
+                throw RealtimeErrorHandler.Wrap(exception);
             }
         }
         public void PushVideoFrame(XmaxVideoFrame frame)
@@ -179,21 +189,55 @@ namespace Xmax.SDK
             RequireConnection();
             using (var operation = _coordinator.Begin(RealtimeOperation.Generation, cancellationToken))
             {
+                if (_generation.TaskId == null) _timing.Begin();
+                await PerformGenerationAsync(context, operation);
+            }
+        }
+        /// <summary>Use an owned local camera stream to connect if necessary and start or update generation.
+        /// A null context reuses the last successful context. The entire call owns one operation lease.</summary>
+        public async Task<RealtimeMediaStream> StartGenerationAsync(RealtimeMediaStream localStream, RealtimeContext context,
+            CancellationToken cancellationToken = default)
+        {
+            _coordinator.RequireAvailable();
+            var format = _media.RequireOwned(localStream);
+            using (var operation = _coordinator.Begin(RealtimeOperation.Generation, cancellationToken))
+            {
+                if (_generation.TaskId == null) _timing.Begin();
                 try
                 {
-                    var taskId = await _generation.StartAsync(context, _videoFormat, operation.Token);
+                    var remote = _connection.CurrentRemoteStream;
+                    if (_connection.ActiveSession == null) remote = await PerformConnectAsync(format, false, operation);
                     operation.EnsureCurrent();
-                    EmitState(new RealtimeState(RealtimeConnectionState.Generating, _connection.ActiveSession.SessionUid, taskId));
-                    operation.EnsureCurrent();
+                    if (remote == null) throw new XmaxException(XmaxErrorCode.RtcError, "Realtime connection has no remote stream.");
+                    await PerformGenerationAsync(context, operation);
+                    return remote;
                 }
-                catch (OperationCanceledException)
-                {
-                    await _generation.StopAsync();
-                    if (!_coordinator.IsTerminating && _connection.ActiveSession != null)
-                        EmitState(new RealtimeState(RealtimeConnectionState.Connected, _connection.ActiveSession.SessionUid));
-                    throw;
-                }
-                catch (Exception exception) { throw RealtimeErrorHandler.Wrap(exception); }
+                catch (Exception exception) { _timing.Fail(exception); throw; }
+            }
+        }
+        private async Task PerformGenerationAsync(RealtimeContext context, RealtimeCoordinator.Operation operation)
+        {
+            try
+            {
+                var taskId = await _generation.StartAsync(context, _videoFormat, operation.Token);
+                operation.EnsureCurrent();
+                EmitState(new RealtimeState(RealtimeConnectionState.Generating, _connection.ActiveSession.SessionUid, taskId));
+                operation.EnsureCurrent();
+                _timing.Finish();
+            }
+            catch (OperationCanceledException exception)
+            {
+                await _generation.StopAsync();
+                if (!_coordinator.IsTerminating && _connection.ActiveSession != null)
+                    EmitState(new RealtimeState(RealtimeConnectionState.Connected, _connection.ActiveSession.SessionUid));
+                _timing.Fail(exception);
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _timing.Fail(exception);
+                XmaxLogger.Failure("Generation", exception);
+                throw RealtimeErrorHandler.Wrap(exception);
             }
         }
         public Task StartGenerationAsync(string prompt, string referencePath = null, CancellationToken cancellationToken = default)
@@ -203,6 +247,8 @@ namespace Xmax.SDK
             _coordinator.RequireThread();
             // Stopping generation while connecting must not cancel the connection operation.
             if (_coordinator.IsConnecting && !_coordinator.IsTerminating) return Task.CompletedTask;
+            if (CurrentState.ConnectionState == RealtimeConnectionState.Connecting)
+                return TerminateAsync(TerminationScope.Connection);
             return TerminateAsync(TerminationScope.Generation);
         }
         public Task DisconnectAsync() => TerminateAsync(TerminationScope.Connection);
@@ -239,12 +285,13 @@ namespace Xmax.SDK
         private void HandleFatalError(XmaxException exception)
         {
             if (!_coordinator.HasOperation && _connection.ActiveSession == null) return;
+            XmaxLogger.Failure("Realtime", exception);
             _failureCleanup = ObserveFailureCleanupAsync(TerminateAsync(TerminationScope.Connection, exception));
         }
         private static async Task ObserveFailureCleanupAsync(Task cleanup)
         {
             try { await cleanup; }
-            catch (Exception exception) { UnityEngine.Debug.LogException(exception); }
+            catch (Exception exception) { XmaxLogger.Failure("Cleanup", exception); }
         }
         private void RequireConnection()
         {
@@ -256,6 +303,7 @@ namespace Xmax.SDK
         {
             if (CurrentState.ConnectionState == state.ConnectionState && CurrentState.SessionId == state.SessionId && CurrentState.TaskId == state.TaskId) return;
             CurrentState = state;
+            XmaxLogger.Info("Realtime", () => "State=" + state.ConnectionState);
             EventDispatch.Raise(StateChanged, state, () => ReferenceEquals(CurrentState, state));
         }
     }
