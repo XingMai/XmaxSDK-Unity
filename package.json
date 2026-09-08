@@ -1,7 +1,7 @@
 {
   "name": "ai.xmax.sdk",
   "displayName": "XmaxSDK",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "unity": "6000.0",
   "description": "Xmax realtime video SDK with host-provided video input and VolcEngine RTC transport.",
   "author": {
