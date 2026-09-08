@@ -21,6 +21,8 @@
 [Rr]ecordings/
 
 # Local build outputs and exported package archives
+.cicd/
+.build/
 [Bb]uild/
 [Bb]uilds/
 *.unitypackage
