@@ -1,0 +1,7 @@
+{
+  "name": "Xmax.SDK.Tests",
+  "rootNamespace": "Xmax.SDK.Tests",
+  "references": ["Xmax.SDK"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

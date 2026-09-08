@@ -54,4 +54,6 @@ git push origin 1.0.0
 
 版本准备同步 `package.json` 与 `Runtime/XmaxSdkInfo.cs`。发布产物为可通过 Unity Package Manager 安装的 `ai.xmax.sdk-<版本>.tgz`，并附 SHA-256 校验文件。成功发布后创建下一 patch 版本的本地 feature 分支。
 
-验证使用独立的最小 Unity 工程，不依赖 PICO 包和相邻的 PicoDemo，也不会创建在线 Session。编译和打包不能替代真机 RTC 联调。
+验证使用独立的最小 Unity 工程，不依赖 PICO 包和相邻的 PicoDemo，也不会创建在线 Session。流程先运行 SDK 的 EditMode 回归测试，再检查公开接口和 Android IL2CPP/ARM64 构建；源码和 tgz 消费均运行同一组测试。编译和打包不能替代真机 RTC 联调。
+
+实时 SDK 按 [架构说明](ARCHITECTURE.md) 的六层维护。原生 RTC 厂商类型限于 Foundation/RTC 和 ThirdParty，序列化厂商类型限于 Foundation/Serialization。新增生命周期行为优先使用 Tests/Editor 的 Session / Stream / RTC 替身验证，避免依赖付费在线 Session。

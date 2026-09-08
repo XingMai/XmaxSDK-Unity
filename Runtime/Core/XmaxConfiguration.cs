@@ -2,12 +2,19 @@ using System;
 
 namespace Xmax.SDK
 {
+    public enum XmaxEnvironment { China, Global }
+
     public sealed class XmaxConfiguration
     {
         public const string DefaultBaseUrl = "https://cloud.xmax.22duck.cn/open/api/v1";
+        public const string GlobalBaseUrl = "https://api.xmax.cloud/open/api/v1";
 
         public string ApiKey { get; }
         public string BaseUrl { get; }
+
+        public XmaxConfiguration(string apiKey, XmaxEnvironment environment)
+            : this(apiKey, environment == XmaxEnvironment.China ? DefaultBaseUrl :
+                environment == XmaxEnvironment.Global ? GlobalBaseUrl : throw new ArgumentOutOfRangeException(nameof(environment))) { }
 
         public XmaxConfiguration(string apiKey, string baseUrl = DefaultBaseUrl)
         {
