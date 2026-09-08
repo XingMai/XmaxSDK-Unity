@@ -22,7 +22,7 @@ docs: expand Unity integration instructions
 
 允许 `feat`、`fix`、`refactor`、`perf`、`test`、`docs`、`build`、`ci`、`chore`、`revert`，可带作用域和破坏性变更标记。合并前的本地 CI 检查本次 feature 新增提交的标题，要求使用可打印 ASCII 字符并包含英文字母。
 
-英文约定从本次调整开始生效，已有中文提交保留原历史。本地 `.cicd/commit-policy.json` 记录调整前的提交作为历史检查边界。
+所有分支的历史提交信息已统一为英文。CI 对待合并范围中的全部提交执行标题检查，不设置历史语言豁免。
 
 ## 本地 CI/CD
 
