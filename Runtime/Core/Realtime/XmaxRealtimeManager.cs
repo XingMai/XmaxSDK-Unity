@@ -36,7 +36,11 @@ namespace Xmax.SDK
 
         public XmaxRealtimeManager(string apiKey, RealtimeModel model = RealtimeModel.X2_0,
             string baseUrl = XmaxConfiguration.DefaultBaseUrl, XmaxLoggerOption loggerOptions = XmaxLoggerOption.None)
-            : this(new XmaxConfiguration(apiKey, baseUrl, loggerOptions), new RealtimeConfiguration(Models.Realtime(model))) { }
+            : this(new XmaxClient(new XmaxConfiguration(apiKey, baseUrl, loggerOptions)), new RealtimeConfiguration(Models.Realtime(model))) { }
+
+        // Preserve the convenience constructor while centralizing global configuration in Client.
+        private XmaxRealtimeManager(XmaxClient client, RealtimeConfiguration options)
+            : this(client.Configuration, options) { }
 
         internal XmaxRealtimeManager(XmaxConfiguration configuration, RealtimeConfiguration options)
             : this(configuration, options, new RealtimeSessionService(new ApiService(configuration)),
@@ -46,7 +50,6 @@ namespace Xmax.SDK
             IRealtimeSessionService sessions, IStreamController stream, RealtimeTiming timing = null)
         {
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-            XmaxLogger.Configure(configuration.LoggerOptions);
             Options = options ?? throw new ArgumentNullException(nameof(options));
             _timing = timing ?? new RealtimeTiming();
             _stream = stream = stream ?? new StreamController(new RtcManager(), timing: _timing);
@@ -117,7 +120,7 @@ namespace Xmax.SDK
                 if (_connection.ActiveSession != null) await _connection.DisconnectAsync();
                 if (!_coordinator.IsTerminating)
                     EmitState(new RealtimeState(exception is OperationCanceledException ? RealtimeConnectionState.Disconnected : RealtimeConnectionState.Error));
-                XmaxLogger.Failure("Connection", exception);
+                XmaxLogger.Realtime.Failure(exception);
                 if (exception is OperationCanceledException) throw;
                 throw RealtimeErrorHandler.Wrap(exception);
             }
@@ -236,7 +239,7 @@ namespace Xmax.SDK
             catch (Exception exception)
             {
                 _timing.Fail(exception);
-                XmaxLogger.Failure("Generation", exception);
+                XmaxLogger.Realtime.Failure(exception);
                 throw RealtimeErrorHandler.Wrap(exception);
             }
         }
@@ -285,13 +288,13 @@ namespace Xmax.SDK
         private void HandleFatalError(XmaxException exception)
         {
             if (!_coordinator.HasOperation && _connection.ActiveSession == null) return;
-            XmaxLogger.Failure("Realtime", exception);
+            XmaxLogger.Realtime.Failure(exception);
             _failureCleanup = ObserveFailureCleanupAsync(TerminateAsync(TerminationScope.Connection, exception));
         }
         private static async Task ObserveFailureCleanupAsync(Task cleanup)
         {
             try { await cleanup; }
-            catch (Exception exception) { XmaxLogger.Failure("Cleanup", exception); }
+            catch (Exception exception) { XmaxLogger.Realtime.Failure(exception); }
         }
         private void RequireConnection()
         {
@@ -303,7 +306,7 @@ namespace Xmax.SDK
         {
             if (CurrentState.ConnectionState == state.ConnectionState && CurrentState.SessionId == state.SessionId && CurrentState.TaskId == state.TaskId) return;
             CurrentState = state;
-            XmaxLogger.Info("Realtime", () => "State=" + state.ConnectionState);
+            XmaxLogger.Realtime.Info(() => "State=" + state.ConnectionState);
             EventDispatch.Raise(StateChanged, state, () => ReferenceEquals(CurrentState, state));
         }
     }

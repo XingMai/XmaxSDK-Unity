@@ -29,8 +29,8 @@ namespace Xmax.SDK.Tests
         [Test] public void LoggingDefaultsOffAndDoesNotEvaluateDisabledMessages()
         {
             var evaluated = false;
-            XmaxLogger.Info("Test", () => { evaluated = true; return "test"; });
-            XmaxLogger.Failure("Test", new Exception("private message"));
+            XmaxLogger.Realtime.Info(() => { evaluated = true; return "test"; });
+            XmaxLogger.Realtime.Failure(new Exception("private message"));
             Assert.False(evaluated);
             Assert.IsEmpty(_logs);
             Assert.AreEqual(XmaxLoggerOption.None, new XmaxConfiguration("").LoggerOptions);
@@ -38,13 +38,13 @@ namespace Xmax.SDK.Tests
         [Test] public void BusinessAndPerformanceCanBeEnabledIndependently()
         {
             XmaxLogger.Configure(XmaxLoggerOption.Business);
-            XmaxLogger.Info("Business", () => "one\ntwo");
-            XmaxLogger.Info("Performance", () => "hidden", XmaxLoggerOption.Performance);
+            XmaxLogger.Realtime.Info(() => "one\ntwo");
+            XmaxLogger.Rtc.Info(() => "hidden", XmaxLoggerOption.Performance);
             Assert.AreEqual(1, _logs.Count);
-            Assert.AreEqual("[Xmax][Business] one\n[Xmax][Business] two", _logs[0]);
+            Assert.AreEqual("[Xmax][Realtime] one\n[Xmax][Realtime] two", _logs[0]);
             XmaxLogger.Configure(XmaxLoggerOption.Performance);
-            XmaxLogger.Info("Business", () => "hidden");
-            XmaxLogger.Info("Performance", () => "visible", XmaxLoggerOption.Performance);
+            XmaxLogger.Realtime.Info(() => "hidden");
+            XmaxLogger.Rtc.Info(() => "visible", XmaxLoggerOption.Performance);
             Assert.AreEqual(2, _logs.Count);
         }
         [Test] public void ApiAndErrorLogsExcludeIdentifiersCredentialsAndExceptionBodies()
@@ -53,8 +53,8 @@ namespace Xmax.SDK.Tests
             ApiLogger.Response("PUT", "/session/private-session/heartbeat?token=secret-token", 200, 123, 42);
             LogAssert.Expect(LogType.Error, "[Xmax][API] POST <route> failed=ApiError duration=50ms");
             ApiLogger.Failure("POST", "/private-path?apiKey=secret-key", new XmaxException(XmaxErrorCode.ApiError, "secret-body"), 50);
-            LogAssert.Expect(LogType.Error, "[Xmax][Callback] Operation failed: Exception");
-            XmaxLogger.Failure("Callback", new Exception("secret-prompt"));
+            LogAssert.Expect(LogType.Error, "[Xmax][Realtime] Operation failed: Exception");
+            XmaxLogger.Realtime.Failure(new Exception("secret-prompt"));
             var output = string.Join("\n", _logs);
             Assert.That(output, Does.Contain("/session/{id}/heartbeat"));
             Assert.That(output, Does.Contain("status=200 duration=42ms bytes=123"));
@@ -69,6 +69,58 @@ namespace Xmax.SDK.Tests
             Assert.False(XmaxLogger.IsEnabled(XmaxLoggerOption.Business));
             Assert.AreEqual(XmaxConfiguration.GlobalBaseUrl, client.Configuration.BaseUrl);
         }
+        [TestCase("Debug", LogType.Log)]
+        [TestCase("Info", LogType.Log)]
+        [TestCase("Warn", LogType.Warning)]
+        [TestCase("Error", LogType.Error)]
+        public void EveryLevelSupportsLazyMessagesAndOptionFiltering(string level, LogType outputType)
+        {
+            Action<Func<string>, XmaxLoggerOption> log;
+            switch (level)
+            {
+                case "Debug": log = XmaxLogger.Rtc.Debug; break;
+                case "Info": log = XmaxLogger.Rtc.Info; break;
+                case "Warn": log = XmaxLogger.Rtc.Warn; break;
+                default: log = XmaxLogger.Rtc.Error; break;
+            }
+            var evaluations = 0;
+            Func<string> message = () => { evaluations++; return "diagnostic"; };
+            XmaxLogger.Configure(XmaxLoggerOption.Business);
+            log(message, XmaxLoggerOption.Performance);
+            log(message, XmaxLoggerOption.All);
+            log(message, XmaxLoggerOption.None);
+            Assert.AreEqual(0, evaluations);
+            Assert.IsEmpty(_logs);
+            XmaxLogger.Configure(XmaxLoggerOption.Performance);
+            LogAssert.Expect(outputType, "[Xmax][RTC] diagnostic");
+            log(message, XmaxLoggerOption.Performance);
+            Assert.AreEqual(1, evaluations);
+            Assert.AreEqual(1, _logs.Count);
+        }
+        [UnityTest] public IEnumerator CreatingManagerDoesNotReapplyAnOlderClientsLoggerOptions() => AsyncTest.Run(async () =>
+        {
+            var oldClient = new XmaxClient(new XmaxConfiguration("", loggerOptions: XmaxLoggerOption.Business));
+            _ = new XmaxClient(new XmaxConfiguration("", loggerOptions: XmaxLoggerOption.Performance));
+            var manager = oldClient.CreateRealtimeManager(new RealtimeConfiguration(Models.Realtime(RealtimeModel.X2_0)));
+            try
+            {
+                Assert.True(XmaxLogger.IsEnabled(XmaxLoggerOption.Performance));
+                Assert.False(XmaxLogger.IsEnabled(XmaxLoggerOption.Business));
+                manager.CreateLocalExternalStream(new RealtimeVideoFormat(1280, 720, 30));
+                Assert.True(XmaxLogger.IsEnabled(XmaxLoggerOption.Performance));
+            }
+            finally { await manager.CloseAsync(); }
+        });
+        [UnityTest] public IEnumerator ConvenienceConstructorAppliesOptionsThroughItsClient() => AsyncTest.Run(async () =>
+        {
+            var manager = new XmaxRealtimeManager("", loggerOptions: XmaxLoggerOption.Performance);
+            try
+            {
+                Assert.True(XmaxLogger.IsEnabled(XmaxLoggerOption.Performance));
+                Assert.False(XmaxLogger.IsEnabled(XmaxLoggerOption.Business));
+            }
+            finally { await manager.CloseAsync(); }
+        });
         [Test] public void QualityControllerMapsBothDirectionsAndRetainsMetrics()
         {
             var rtc = new FakeRtc();
@@ -124,7 +176,8 @@ namespace Xmax.SDK.Tests
         {
             var timing = new RealtimeTiming(); var rtc = new FakeRtc();
             var stream = new StreamController(rtc, taskIdFactory: () => "startup", timing: timing);
-            var manager = new XmaxRealtimeManager(new XmaxConfiguration("test", loggerOptions: XmaxLoggerOption.Performance),
+            var client = new XmaxClient(new XmaxConfiguration("test", loggerOptions: XmaxLoggerOption.Performance));
+            var manager = new XmaxRealtimeManager(client.Configuration,
                 new RealtimeConfiguration(Models.Realtime(RealtimeModel.X2_0)), new FakeSessions(), stream, timing);
             try
             {

@@ -70,7 +70,7 @@ namespace Xmax.SDK
             try { await _sessions.CloseSessionAsync(session.SessionUid, CancellationToken.None); }
             catch (Exception exception)
             {
-                XmaxLogger.Failure("Session", exception);
+                XmaxLogger.Realtime.Failure(exception);
                 EventDispatch.Raise(CleanupError, RealtimeErrorHandler.Wrap(exception));
             }
         }

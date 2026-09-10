@@ -16,6 +16,7 @@ namespace Xmax.SDK.Tests
         private static RealtimeVideoFormat Format => new RealtimeVideoFormat(1280, 720, 30);
         [SetUp] public void SetUp()
         {
+            XmaxLogger.Configure(XmaxLoggerOption.None);
             _sessions = new FakeSessions(); _stream = new FakeStream();
             _manager = new XmaxRealtimeManager(new XmaxConfiguration("test"), new RealtimeConfiguration(Models.Realtime(RealtimeModel.X2_0)), _sessions, _stream);
         }

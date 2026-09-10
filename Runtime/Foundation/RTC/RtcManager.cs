@@ -135,7 +135,7 @@ namespace Xmax.SDK
                 if (!_didLogVideoTimestampWarning)
                 {
                     _didLogVideoTimestampWarning = true;
-                    XmaxLogger.Warning("RTC",
+                    XmaxLogger.Rtc.Warn(() =>
                         "RTC reported a video timestamp interval warning; " +
                         "the frame was accepted and streaming will continue.");
                 }
@@ -292,7 +292,7 @@ namespace Xmax.SDK
                     frame.TimestampUs, (XmaxVideoRotation)(int)frame.Rotation);
                 FrameReceived?.Invoke(FromNative(key), converted);
             }
-            catch (Exception exception) { XmaxLogger.Failure("RTC", exception); }
+            catch (Exception exception) { XmaxLogger.Rtc.Failure(exception); }
             return true;
         }
         public void SendSei(byte[] data)

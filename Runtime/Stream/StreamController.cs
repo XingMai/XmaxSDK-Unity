@@ -78,7 +78,7 @@ namespace Xmax.SDK
                 _timing?.BeginSignal(taskId);
                 _rtc.SendRoomMessage(RtcRoomEvent.Start(_info.UserId, taskId, format, context));
                 _timing?.SignalSent(taskId);
-                XmaxLogger.Info("Room", () => "Generation start signal sent.");
+                XmaxLogger.Room.Info(() => "Generation start signal sent.");
                 _sei = RunSeiAsync(taskId, _generationCancellation.Token);
                 await AsyncDeadline.WaitAsync(_confirmation.Task, _generationTimeout, cancellationToken);
                 return taskId;
@@ -110,7 +110,7 @@ namespace Xmax.SDK
             if (taskId != null && _info != null)
             {
                 try { _rtc.SendRoomMessage(RtcRoomEvent.Stop(_info.UserId, taskId)); }
-                catch (Exception exception) { XmaxLogger.Failure("Room", exception); }
+                catch (Exception exception) { XmaxLogger.Room.Failure(exception); }
             }
         }
         private bool Accept(RemoteStream key) => _info != null && key.RoomId == _info.RoomId &&

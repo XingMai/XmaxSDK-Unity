@@ -29,7 +29,7 @@ namespace Xmax.SDK
         {
             if (!_active) return;
             Mark("ready");
-            XmaxLogger.Info("Timing", () => Format("ready"), XmaxLoggerOption.Performance);
+            XmaxLogger.Timing.Info(() => Format("ready"), XmaxLoggerOption.Performance);
             _active = false;
         }
         internal void Fail(Exception exception)
@@ -37,7 +37,7 @@ namespace Xmax.SDK
             if (!_active) return;
             Mark("failed");
             if (!(exception is OperationCanceledException))
-                XmaxLogger.Info("Timing", () => Format("failed") + " error=" + XmaxLogger.ErrorCode(exception), XmaxLoggerOption.Performance);
+                XmaxLogger.Timing.Info(() => Format("failed") + " error=" + XmaxLogger.ErrorCode(exception), XmaxLoggerOption.Performance);
             _active = false;
         }
         internal string Format(string end)

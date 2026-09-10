@@ -133,7 +133,9 @@ manager.NetworkQualityChanged += quality =>
     UnityEngine.Debug.Log($"Up: {quality.Uplink}, Down: {quality.Downlink}");
 ```
 
-日志选项与 iOS 一致：`None`（默认关闭）、`Business`（API、连接、生成和错误）、`Performance`（网络质量和启动耗时）、`All`。配置为 SDK 全局选项，最近创建的 Client / Manager 配置生效；第三方 RTC 和 Unity 自身的日志不受此开关控制。日志开关不影响错误事件或 Task 异常。
+日志选项与 iOS 一致：`None`（默认关闭）、`Business`（API、连接、生成和错误）、`Performance`（网络质量和启动耗时）、`All`。配置为 SDK 全局选项，仅在 Client 初始化时更新；从已有 Client 创建 Manager 不会覆盖较新 Client 的配置。直接使用 `new XmaxRealtimeManager(...)` 的兼容入口会创建一个 Client 来应用配置。第三方 RTC 和 Unity 自身的日志不受此开关控制，日志开关不影响错误事件或 Task 异常。
+
+内部调用与 iOS 的分类实例对应，例如 `XmaxLogger.Realtime.Info(() => "Connected")`、`XmaxLogger.Rtc.Warn(() => "Limited", XmaxLoggerOption.Performance)`。`Debug / Info / Warn / Error` 均支持相同的分类选项和延迟消息求值。Unity Console 的 Debug 和 Info 均输出为普通 Log，Warn 和 Error 分别输出为 Warning 和 Error。
 
 启动耗时使用单调时钟，覆盖 Session 创建、RTC 进房、连接、开始信令、SEI 匹配和首帧就绪；失败记录停留阶段，更新已运行任务不会重复计算启动耗时。直接连接后再生成只统计生成阶段，一键生成包含连接阶段。
 

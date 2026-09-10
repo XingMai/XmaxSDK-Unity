@@ -68,7 +68,9 @@ Unity 与 PICO 相机、手部追踪、权限及场景 UI 的生命周期不同�
 
 `RtcQualityConverter` 将厂商上下行等级和统计转换为 Foundation 自有模型，`QualityController` 再转换为公开的 `RealtimeNetworkQuality`。公开等级与 iOS 相同，同时保留 Unity 已有的丢包率、RTT、带宽字段。当前厂商枚举没有 Down，未知值映射为 Unknown。
 
-`XmaxLoggerOption` 分 Business / Performance，默认 None；采用与 iOS 一致的全局配置方式。`ApiLogger` 记录路由模板、状态、耗时和字节数，不输出敏感正文或认证数据。`RealtimeTiming` 由同一 Manager 的连接和 Stream 控制器共享，使用单调时钟和任务 ID 匹配记录从 Session 到首帧的各阶段耗时；不同启动操作之间重置，更新当前任务不重复计时。
+`XmaxLoggerOption` 分 Business / Performance，默认 None；全局配置仅在 Client 初始化时更新。Manager 不重新应用配置；兼容的 Manager 直接构造入口通过创建 Client 应用参数。`XmaxLogger` 使用与 iOS 相同的不可变分类实例：Realtime、RTC、Media、API、Storage、Room、Stream、Render、Interaction、Permission、Timing。Debug / Info / Warn / Error 统一支持延迟消息和日志选项，分类不能由调用点自由拼写。Unity 将 Debug / Info 输出到普通 Console Log。
+
+`ApiLogger` 记录路由模板、状态、耗时和字节数，不输出敏感正文或认证数据。`RealtimeTiming` 由同一 Manager 的连接和 Stream 控制器共享，使用单调时钟和任务 ID 匹配记录从 Session 到首帧的各阶段耗时；不同启动操作之间重置，更新当前任务不重复计时。
 
 ## 当前范围外及平台差异
 
