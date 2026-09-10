@@ -1,0 +1,44 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_between_query_expression_clauses = true
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_preserve_single_line_statements = false
+csharp_preserve_single_line_blocks = false
+dotnet_sort_system_directives_first = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+# Preserve the vendor's source layout; SDK formatting rules target handwritten code.
+[Runtime/ThirdParty/**]
+generated_code = true
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset
+csharp_new_line_before_open_brace = unset
+csharp_new_line_before_else = unset
+csharp_new_line_before_catch = unset
+csharp_new_line_before_finally = unset
+csharp_new_line_between_query_expression_clauses = unset
+csharp_indent_case_contents = unset
+csharp_indent_switch_labels = unset
+csharp_preserve_single_line_statements = unset
+csharp_preserve_single_line_blocks = unset
+dotnet_sort_system_directives_first = unset
