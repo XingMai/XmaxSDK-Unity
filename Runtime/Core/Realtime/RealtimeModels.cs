@@ -10,7 +10,12 @@ namespace Xmax.SDK
         /// <summary>
         /// x2.0 实时生成模型。
         /// </summary>
-        X2_0
+        X2_0,
+
+        /// <summary>
+        /// x2.0-pro 实时生成模型。
+        /// </summary>
+        X2_0_Pro
     }
 
     /// <summary>
@@ -55,6 +60,8 @@ namespace Xmax.SDK
             {
                 case RealtimeModel.X2_0:
                     return new ModelDefinition("x2.0");
+                case RealtimeModel.X2_0_Pro:
+                    return new ModelDefinition("x2.0-pro");
                 default:
                     throw new ArgumentOutOfRangeException(nameof(model), model, null);
             }

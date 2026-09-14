@@ -117,6 +117,16 @@ texture.Dispose();
 
 推荐编码尺寸沿用 iOS x2.0 的 600,000–1,280,000 像素、32 对齐规则，默认 24 fps。显式 `ConnectAsync(1280, 720, 30)` 仍保留，外部输入帧尺寸可以与编码尺寸不同。自定义模型需提供明确尺寸，不套用 x2.0 的建议。
 
+内置模型包括 `RealtimeModel.X2_0`（`"x2.0"`）和 `RealtimeModel.X2_0_Pro`（`"x2.0-pro"`），默认仍为 `X2_0`。选择 Pro 时使用显式编码格式；参考 iOS 的 Pro 模型约定，宽高使用 `1024 × 1920` 或 `1920 × 1024`，默认帧率为 30 fps。当前 Unity 的 `RecommendVideoFormat` 和 `GetCapabilities` 仅支持 `x2.0`。
+
+```csharp
+var proManager = client.CreateRealtimeManager(
+    new RealtimeConfiguration(Models.Realtime(RealtimeModel.X2_0_Pro)));
+var proLocal = proManager.CreateLocalExternalStream(
+    new RealtimeVideoFormat(1024, 1920, 30));
+// 与上例相同，在等待生成期间持续向 proLocal 推送 Camera 帧。
+```
+
 交互使用 `SendTracks` 的编码像素坐标；`InteractionCoordinateMapper.TryMap` 可将 Fit/Fill 视口坐标映射为编码像素，统一采用左上角原点。Unity 屏幕坐标通常以左下角为原点，宿主应先转换 Y；相机旋转或镜像也应先反向映射。纹理上传器暴露 `Rotation`，材质的 UV 旋转、YUV 色彩转换和视觉效果由宿主处理。
 
 视频帧包装现有数组，不复制像素。调用期间不要修改输入数据；若需跨回调保留并修改帧，使用 `frame.Clone()`。长期不使用的 Manager 应调用 `CloseAsync`，纹理上传器应调用 `Dispose`。
