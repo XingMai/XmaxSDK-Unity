@@ -52,7 +52,7 @@ namespace Xmax.SDK
                     _context = context;
                 }
 
-                return TaskId; // 生成中传入空条件时复用当前任务，与 iOS 语义一致。
+                return TaskId; // 生成中传入空条件时复用当前任务。
             }
 
             var resolved = context ?? _context ?? throw new XmaxException(

@@ -8,9 +8,59 @@ namespace Xmax.SDK.Tests
 {
     public sealed class RealtimeModelTests
     {
+        [Test]
+        public void EveryModelHasUniqueRegistrationAndConsistentLookups()
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            var service = new MediaService();
+            foreach (RealtimeModel model in Enum.GetValues(typeof(RealtimeModel)))
+            {
+                var definition = Models.Realtime(model);
+                var capabilities = model.GetCapabilities();
+                var camera = capabilities.DefaultCameraVideoFormat;
+
+                Assert.IsTrue(names.Add(definition.Name), "Model names must be unique.");
+                Assert.AreSame(capabilities, definition.Capabilities);
+                Assert.AreSame(capabilities,
+                    service.GetCapabilities(new ModelDefinition("  " + definition.Name + "  ")));
+                Assert.Greater(capabilities.MinimumPixels, 0);
+                Assert.GreaterOrEqual(capabilities.MaximumPixels, capabilities.MinimumPixels);
+                Assert.Greater(capabilities.DimensionAlignment, 0);
+                Assert.DoesNotThrow(() => camera.Validate());
+                Assert.AreEqual(camera, service.RecommendVideoFormat(definition, camera.Width, camera.Height));
+            }
+        }
+
+        [Test]
+        public void ModelRulesUseSuppliedParametersAndCopyResolutionInput()
+        {
+            var service = new MediaService();
+            var camera = new RealtimeVideoFormat(160, 240, 48);
+            var capabilities = new RealtimeModelCapabilities(10000, 50000, 16, camera);
+            var definition = new ModelDefinition("test-flexible-model", capabilities);
+            var recommended = service.RecommendVideoFormat(definition, 100, 100);
+
+            Assert.AreEqual(10000, capabilities.MinimumPixels);
+            Assert.AreEqual(50000, capabilities.MaximumPixels);
+            Assert.AreEqual(16, capabilities.DimensionAlignment);
+            Assert.AreEqual(48, recommended.Fps);
+            Assert.That(recommended.Width * recommended.Height, Is.InRange(10000, 50000));
+            Assert.AreEqual(0, recommended.Width % 16);
+            Assert.AreEqual(0, recommended.Height % 16);
+
+            var sizes = new[] { new RealtimeVideoSize(160, 240) };
+            var fixedCapabilities = new RealtimeModelCapabilities(10000, 50000, 16, camera, sizes);
+            var fixedModel = new ModelDefinition("test-fixed-model", fixedCapabilities);
+            sizes[0] = new RealtimeVideoSize(128, 128);
+
+            Assert.AreEqual(camera, service.RecommendVideoFormat(fixedModel, 160, 240));
+            Assert.AreEqual(XmaxErrorCode.InvalidConfiguration,
+                Assert.Throws<XmaxException>(() => service.RecommendVideoFormat(fixedModel, 128, 128)).Code);
+        }
+
         [TestCase(RealtimeModel.X2_0, 832, 1472, 1280000)]
         [TestCase(RealtimeModel.X2_0_Pro, 1024, 1920, 2100000)]
-        public void ModelDefaultsMatchIosAndRemainValidThroughRecommendation(
+        public void ModelDefaultsMatchPublishedSpecificationsAndRemainValidThroughRecommendation(
             RealtimeModel model, int width, int height, int maximumPixels)
         {
             var definition = Models.Realtime(model);

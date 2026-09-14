@@ -143,7 +143,7 @@ namespace Xmax.SDK.Tests
             var error = Assert.Throws<XmaxException>(() => ApiService.ParseEnvelope("{\"success\":false,\"code\":42,\"message\":\"bad\"}", 400, false, null));
             Assert.AreEqual(42, error.ApiCode); Assert.AreEqual(400, error.HttpStatus);
         }
-        [Test] public void RecommendationMatchesIosRoundingBeforeBoundarySearch()
+        [Test] public void RecommendationAppliesRoundingBeforeBoundarySearch()
         {
             var model = Models.Realtime(RealtimeModel.X2_0);
             var service = new MediaService();

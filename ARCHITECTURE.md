@@ -91,4 +91,4 @@ EditMode 测试使用 Session、Stream 和 RTC 替身，覆盖连接取消、迟
 
 本地 CI 另行编译最小消费端并构建 Android IL2CPP/ARM64 APK，校验 RTC 原生库。测试不创建真实在线 Session；生成首帧、网络抖动、重新发布和 PICO 输入链仍需带凭据的 Android 真机联调。
 
-模型能力定义位于 `Core/Realtime/RealtimeModelCapabilities.cs`，保存固定分辨率、像素上下界、尺寸对齐和默认 Camera 规格。`MediaService` 负责尺寸推荐，Manager 在创建本地流及建立连接前检查固定分辨率；各入口共享模型配置。
+模型注册记录集中在 `Core/Realtime/RealtimeModelRegistry.cs`，每条记录关联枚举、服务端名称和能力参数；名称索引从这些记录生成。`RealtimeModelCapabilities` 保存固定分辨率、像素上下界、尺寸对齐和默认 Camera 规格，不包含具体模型实例或模型名称分支。`MediaService` 负责尺寸推荐，Manager 在创建本地流及建立连接前检查固定分辨率；各入口共享注册配置。

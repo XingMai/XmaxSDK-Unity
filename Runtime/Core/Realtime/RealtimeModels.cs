@@ -31,20 +31,33 @@ namespace Xmax.SDK
         /// <summary>
         /// 内置模型的分辨率约束及默认 Camera 规格；自定义模型为 null，需显式提供编码格式。
         /// </summary>
-        public RealtimeModelCapabilities Capabilities => RealtimeModelCapabilities.ForName(Name);
+        public RealtimeModelCapabilities Capabilities { get; }
 
         /// <summary>
         /// 创建并校验服务端模型名称。
         /// </summary>
         /// <param name="name">非空服务端模型名称，首尾空白会被移除。</param>
         /// <exception cref="XmaxException">规范化后的模型名称为空。</exception>
-        public ModelDefinition(string name)
+        public ModelDefinition(string name) : this(name, null)
+        {
+            Capabilities = RealtimeModelRegistry.Find(Name)?.Capabilities;
+        }
+
+        /// <summary>
+        /// 使用明确的能力参数创建模型定义；注册表初始化通过此入口避免递归查询自身。
+        /// </summary>
+        /// <param name="name">非空服务端模型名称，首尾空白会被移除。</param>
+        /// <param name="capabilities">模型能力参数；未知模型可为 null。</param>
+        /// <exception cref="XmaxException">规范化后的模型名称为空。</exception>
+        internal ModelDefinition(string name, RealtimeModelCapabilities capabilities)
         {
             Name = (name ?? string.Empty).Trim();
             if (Name.Length == 0)
             {
                 throw new XmaxException(XmaxErrorCode.InvalidConfiguration, "Model name cannot be empty.");
             }
+
+            Capabilities = capabilities;
         }
     }
 
@@ -68,19 +81,11 @@ namespace Xmax.SDK
         /// 解析内置实时模型对应的服务端名称。
         /// </summary>
         /// <param name="model">SDK 内置实时模型标识。</param>
-        /// <returns>指定实时模型的定义。</returns>
+        /// <returns>指定实时模型的共享不可变定义。</returns>
         /// <exception cref="ArgumentOutOfRangeException">model 不是已定义的内置模型。</exception>
         public static ModelDefinition Realtime(RealtimeModel model)
         {
-            switch (model)
-            {
-                case RealtimeModel.X2_0:
-                    return new ModelDefinition("x2.0");
-                case RealtimeModel.X2_0_Pro:
-                    return new ModelDefinition("x2.0-pro");
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(model), model, null);
-            }
+            return RealtimeModelRegistry.Get(model);
         }
     }
 

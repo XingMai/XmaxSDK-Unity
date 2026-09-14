@@ -35,14 +35,6 @@ namespace Xmax.SDK
     /// </summary>
     public sealed class RealtimeModelCapabilities
     {
-        // 与 iOS 一致的内置模型配置，所有调用方共享只读实例。
-        private static readonly RealtimeModelCapabilities Standard = new RealtimeModelCapabilities(
-            1280000, new RealtimeVideoFormat(832, 1472, 30));
-
-        private static readonly RealtimeModelCapabilities Pro = new RealtimeModelCapabilities(
-            2100000, new RealtimeVideoFormat(1024, 1920, 30),
-            new RealtimeVideoSize(1024, 1920), new RealtimeVideoSize(1920, 1024));
-
         /// <summary>
         /// 支持的固定分辨率，只读；非空时宽高必须精确匹配，不自动缩放或取整。
         /// 空列表表示尺寸推荐使用像素上下界和对齐规则。
@@ -52,7 +44,7 @@ namespace Xmax.SDK
         /// <summary>
         /// 最小像素总数，仅在固定分辨率列表为空时参与尺寸推荐。
         /// </summary>
-        public int MinimumPixels { get; } = 600000;
+        public int MinimumPixels { get; }
 
         /// <summary>
         /// 最大像素总数，仅在固定分辨率列表为空时参与尺寸推荐。
@@ -62,7 +54,7 @@ namespace Xmax.SDK
         /// <summary>
         /// 推荐宽高的对齐倍数，仅在固定分辨率列表为空时参与尺寸推荐。
         /// </summary>
-        public int DimensionAlignment { get; } = 32;
+        public int DimensionAlignment { get; }
 
         /// <summary>
         /// 未指定帧率时使用的每秒帧数，与默认 Camera 规格保持一致。
@@ -75,37 +67,25 @@ namespace Xmax.SDK
         public RealtimeVideoFormat DefaultCameraVideoFormat { get; }
 
         /// <summary>
-        /// 创建内置模型配置，固定分辨率以只读集合对外提供。
+        /// 保存模型能力参数，复制固定分辨率列表并以只读集合对外提供。
         /// </summary>
+        /// <param name="minimumPixels">无固定分辨率时用于尺寸推荐的像素下界。</param>
         /// <param name="maximumPixels">无固定分辨率时用于尺寸推荐的像素上界。</param>
+        /// <param name="dimensionAlignment">无固定分辨率时推荐宽高的对齐倍数。</param>
         /// <param name="defaultCameraVideoFormat">默认 Camera 编码宽高和帧率。</param>
         /// <param name="resolutionBuckets">固定分辨率列表；为空时采用像素上下界和对齐规则。</param>
-        private RealtimeModelCapabilities(
+        internal RealtimeModelCapabilities(
+            int minimumPixels,
             int maximumPixels,
+            int dimensionAlignment,
             RealtimeVideoFormat defaultCameraVideoFormat,
             params RealtimeVideoSize[] resolutionBuckets)
         {
+            MinimumPixels = minimumPixels;
             MaximumPixels = maximumPixels;
+            DimensionAlignment = dimensionAlignment;
             DefaultCameraVideoFormat = defaultCameraVideoFormat;
-            ResolutionBuckets = Array.AsReadOnly(resolutionBuckets);
-        }
-
-        /// <summary>
-        /// 按服务端模型名称查找内置配置。
-        /// </summary>
-        /// <param name="name">服务端模型名称。</param>
-        /// <returns>内置模型的共享配置；自定义或未知模型返回 null。</returns>
-        internal static RealtimeModelCapabilities ForName(string name)
-        {
-            switch (name)
-            {
-                case "x2.0":
-                    return Standard;
-                case "x2.0-pro":
-                    return Pro;
-                default:
-                    return null;
-            }
+            ResolutionBuckets = Array.AsReadOnly((RealtimeVideoSize[])resolutionBuckets.Clone());
         }
 
         /// <summary>
