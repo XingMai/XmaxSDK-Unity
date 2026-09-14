@@ -161,9 +161,24 @@ namespace Xmax.SDK
         }
 
         /// <summary>
+        /// 使用当前模型的默认 Camera 编码规格创建本地输入流，可在未连接时预览。
+        /// </summary>
+        /// <returns>采用模型默认宽高和帧率的本地流；宿主仍需持续推送 Camera 帧。</returns>
+        /// <exception cref="XmaxException">自定义模型没有默认规格，或当前状态不允许替换本地流。</exception>
+        public RealtimeMediaStream CreateLocalExternalStream()
+        {
+            _coordinator.RequireAvailable();
+            var capabilities = Options.Model.Capabilities ?? throw new XmaxException(
+                XmaxErrorCode.NotSupported,
+                "Custom models require an explicit Camera video format.");
+
+            return CreateLocalExternalStream(capabilities.DefaultCameraVideoFormat);
+        }
+
+        /// <summary>
         /// 创建或替换本地 Camera 输入流，可在未连接时预览；连接或异步操作期间不可替换。
         /// </summary>
-        /// <param name="format">本地视频编码格式，宽高须为正偶数且帧率大于零。</param>
+        /// <param name="format">本地视频编码格式，宽高须为正偶数且帧率大于零；Pro 须精确匹配固定分辨率。</param>
         /// <returns>属于此管理器的新本地流，旧本地流随即失效。</returns>
         /// <exception cref="XmaxException">编码格式无效，或当前线程、连接、操作状态不允许替换本地流。</exception>
         public RealtimeMediaStream CreateLocalExternalStream(RealtimeVideoFormat format)
@@ -173,6 +188,8 @@ namespace Xmax.SDK
                 throw new XmaxException(
                     XmaxErrorCode.InvalidConfiguration,
                     "Disconnect before replacing the local source.");
+
+            ValidateVideoFormat(format);
 
             return _media.CreateExternalStream(format);
         }
@@ -246,7 +263,7 @@ namespace Xmax.SDK
             if (_connection.ActiveSession != null)
                 throw new XmaxException(XmaxErrorCode.InvalidConfiguration, "Realtime connection is already open.");
 
-            format.Validate();
+            ValidateVideoFormat(format);
             _configuration.Validate();
 
             using (var operation = _coordinator.Begin(RealtimeOperation.Connection, cancellationToken))
@@ -269,6 +286,7 @@ namespace Xmax.SDK
         {
             try
             {
+                ValidateVideoFormat(format);
                 _configuration.Validate();
                 _stream.ValidatePlatform();
                 if (createSource)
@@ -647,6 +665,17 @@ namespace Xmax.SDK
             {
                 XmaxLogger.Realtime.Failure(exception);
             }
+        }
+
+        /// <summary>
+        /// 校验显式编码格式及模型的固定分辨率约束，不自动改写调用方的编码尺寸。
+        /// </summary>
+        /// <param name="format">要用于本地流或 RTC 连接的编码格式。</param>
+        /// <exception cref="XmaxException">格式无效，或未精确匹配模型的固定分辨率。</exception>
+        private void ValidateVideoFormat(RealtimeVideoFormat format)
+        {
+            format.Validate();
+            Options.Model.Capabilities?.ValidateResolution(format.Width, format.Height);
         }
 
         /// <summary>

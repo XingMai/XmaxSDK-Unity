@@ -115,17 +115,34 @@ await manager.CloseAsync();
 texture.Dispose();
 ```
 
-推荐编码尺寸沿用 iOS x2.0 的 600,000–1,280,000 像素、32 对齐规则，默认 24 fps。显式 `ConnectAsync(1280, 720, 30)` 仍保留，外部输入帧尺寸可以与编码尺寸不同。自定义模型需提供明确尺寸，不套用 x2.0 的建议。
+模型配置与 iOS 对齐，由 `RealtimeModel.GetCapabilities()`、`ModelDefinition.Capabilities` 或 `MediaService.GetCapabilities()` 读取同一份不可变配置。
 
-内置模型包括 `RealtimeModel.X2_0`（`"x2.0"`）和 `RealtimeModel.X2_0_Pro`（`"x2.0-pro"`），默认仍为 `X2_0`。选择 Pro 时使用显式编码格式；参考 iOS 的 Pro 模型约定，宽高使用 `1024 × 1920` 或 `1920 × 1024`，默认帧率为 30 fps。当前 Unity 的 `RecommendVideoFormat` 和 `GetCapabilities` 仅支持 `x2.0`。
+| 配置 | `X2_0` | `X2_0_Pro` |
+| --- | --- | --- |
+| 服务端名称 | `x2.0` | `x2.0-pro` |
+| 固定分辨率 `ResolutionBuckets` | 空，按像素范围与对齐规则推荐 | 1024×1920、1920×1024 |
+| 像素下界 `MinimumPixels` | 600,000 | 600,000 |
+| 像素上界 `MaximumPixels` | 1,280,000 | 2,100,000 |
+| 尺寸对齐 `DimensionAlignment` | 32 | 32 |
+| 默认帧率 `DefaultFps` | 30 fps | 30 fps |
+| 默认 Camera 规格 `DefaultCameraVideoFormat` | 832×1472@30 | 1024×1920@30 |
+
+固定分辨率列表非空时，宽高必须精确匹配，像素上下界和对齐参数不参与自动缩放。Pro 的尺寸推荐、本地流创建和连接入口都会拒绝其他尺寸，且在创建在线 Session 前完成校验。`RecommendVideoFormat` 的 `fps = 0` 使用模型默认帧率，显式正帧率会保留；直接传入 `RealtimeVideoFormat` 时帧率仍须大于零。
 
 ```csharp
-var proManager = client.CreateRealtimeManager(
-    new RealtimeConfiguration(Models.Realtime(RealtimeModel.X2_0_Pro)));
-var proLocal = proManager.CreateLocalExternalStream(
-    new RealtimeVideoFormat(1024, 1920, 30));
-// 与上例相同，在等待生成期间持续向 proLocal 推送 Camera 帧。
+var model = RealtimeModel.X2_0_Pro;
+var capabilities = model.GetCapabilities();
+IXmaxRealtimeManager proManager = client.CreateRealtimeManager(
+    new RealtimeConfiguration(Models.Realtime(model)));
+
+// 使用模型默认规格：1024×1920@30。
+var proLocal = proManager.CreateLocalExternalStream();
+// 宿主仍负责采集 Camera，并持续向 proLocal 推帧。
+// 需要横屏时可在未连接状态创建：
+// proManager.CreateLocalExternalStream(new RealtimeVideoFormat(1920, 1024, 30));
 ```
+
+默认模型仍为 `X2_0`。普通版尺寸推荐从原先默认 24 fps 调整为 30 fps；需要 24 fps 的接入方应显式传入。普通版显式 `ConnectAsync(1280, 720, 30)` 保留原尺寸，尺寸调整通过 `RecommendVideoFormat` 显式完成。外部输入帧尺寸可以与编码尺寸不同。自定义模型的 `Capabilities` 为 null，需提供明确编码规格，不套用内置模型建议或默认 Camera 规格。
 
 交互使用 `SendTracks` 的编码像素坐标；`InteractionCoordinateMapper.TryMap` 可将 Fit/Fill 视口坐标映射为编码像素，统一采用左上角原点。Unity 屏幕坐标通常以左下角为原点，宿主应先转换 Y；相机旋转或镜像也应先反向映射。纹理上传器暴露 `Rotation`，材质的 UV 旋转、YUV 色彩转换和视觉效果由宿主处理。
 

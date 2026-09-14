@@ -3,67 +3,31 @@ using System;
 namespace Xmax.SDK
 {
     /// <summary>
-    /// x2.0 模型推荐编码格式使用的像素范围、尺寸对齐及默认帧率。
-    /// </summary>
-    public sealed class RealtimeModelCapabilities
-    {
-        /// <summary>
-        /// 推荐编码尺寸的最小像素总数。
-        /// </summary>
-        public int MinimumPixels { get; } = 600000;
-
-        /// <summary>
-        /// 推荐编码尺寸的最大像素总数。
-        /// </summary>
-        public int MaximumPixels { get; } = 1280000;
-
-        /// <summary>
-        /// 推荐宽高需要对齐的像素倍数。
-        /// </summary>
-        public int DimensionAlignment { get; } = 32;
-
-        /// <summary>
-        /// 未指定帧率时使用的每秒帧数。
-        /// </summary>
-        public int DefaultFps { get; } = 24;
-
-        /// <summary>
-        /// 创建内置 x2.0 模型能力描述。
-        /// </summary>
-        internal RealtimeModelCapabilities()
-        {
-        }
-    }
-
-    /// <summary>
     /// 提供无需在线请求的模型能力查询和视频编码尺寸建议。
     /// </summary>
     public sealed class MediaService
     {
         /// <summary>
-        /// 查询内置 x2.0 模型的编码建议限制。
+        /// 查询内置实时模型的分辨率约束和默认 Camera 编码规格。
         /// </summary>
         /// <param name="model">目标模型定义。</param>
-        /// <returns>模型像素范围、尺寸对齐和默认帧率。</returns>
-        /// <exception cref="XmaxException">模型为空或不是内置 x2.0 模型。</exception>
+        /// <returns>模型固定分辨率、像素范围、尺寸对齐和默认 Camera 规格。</returns>
+        /// <exception cref="XmaxException">模型为空或不是受支持的内置模型。</exception>
         public RealtimeModelCapabilities GetCapabilities(ModelDefinition model)
         {
-            if (model == null || model.Name != "x2.0")
-                throw new XmaxException(
-                    XmaxErrorCode.NotSupported,
-                    "Media recommendations are available for x2.0 only. Custom models can use explicit formats.");
-
-            return new RealtimeModelCapabilities();
+            return model?.Capabilities ?? throw new XmaxException(
+                XmaxErrorCode.NotSupported,
+                "Media recommendations require a built-in realtime model. Custom models can use explicit formats.");
         }
 
         /// <summary>
-        /// 按源画面比例及 x2.0 像素限制推荐对齐后的编码尺寸。
+        /// 按模型配置解析编码尺寸；固定分辨率须精确匹配，其他模型按像素范围和对齐规则推荐。
         /// </summary>
         /// <param name="model">目标模型定义。</param>
         /// <param name="sourceWidth">原始 Camera 画面的宽度，必须大于零。</param>
         /// <param name="sourceHeight">原始 Camera 画面的高度，必须大于零。</param>
         /// <param name="fps">期望帧率，0 表示使用模型默认帧率，负数无效。</param>
-        /// <returns>符合模型像素范围和 32 像素对齐要求的编码格式。</returns>
+        /// <returns>符合模型尺寸约束的编码格式，保留显式帧率或采用模型默认帧率。</returns>
         /// <exception cref="XmaxException">模型不受支持，或源尺寸、帧率不符合要求。</exception>
         public RealtimeVideoFormat RecommendVideoFormat(
             ModelDefinition model,
@@ -77,6 +41,13 @@ namespace Xmax.SDK
                     "Source dimensions must be positive and fps cannot be negative.");
 
             var capability = GetCapabilities(model);
+            if (capability.ResolutionBuckets.Count > 0)
+            {
+                capability.ValidateResolution(sourceWidth, sourceHeight);
+
+                return new RealtimeVideoFormat(sourceWidth, sourceHeight, fps == 0 ? capability.DefaultFps : fps);
+            }
+
             var area = (double)sourceWidth * sourceHeight;
             var scale = area < capability.MinimumPixels ? Math.Sqrt(capability.MinimumPixels / area) :
                 area > capability.MaximumPixels ? Math.Sqrt(capability.MaximumPixels / area) : 1;

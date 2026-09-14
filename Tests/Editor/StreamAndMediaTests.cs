@@ -132,7 +132,7 @@ namespace Xmax.SDK.Tests
             var format = new MediaService().RecommendVideoFormat(Models.Realtime(RealtimeModel.X2_0), width, height);
             Assert.AreEqual(0, format.Width % 32); Assert.AreEqual(0, format.Height % 32);
             Assert.That(format.Width * format.Height, Is.InRange(600000, 1280000));
-            Assert.AreEqual(24, format.Fps);
+            Assert.AreEqual(30, format.Fps);
         }
         [Test] public void ApiEnvelopeHandlesEmptyDeleteAndMalformedResponses()
         {

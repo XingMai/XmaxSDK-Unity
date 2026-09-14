@@ -9,7 +9,7 @@
 | 层 | Unity 组件 | 与 iOS 的对应关系 |
 | --- | --- | --- |
 | Core | `XmaxClient`、`IXmaxRealtimeManager`、`XmaxRealtimeManager`、`RealtimeCoordinator`、连接和生成 Manager、错误分类 | Client 组合依赖，Realtime facade 委派业务，协调器统一操作准入、取消和清理 |
-| Service | `IApiService` / `ApiService`、`IRealtimeSessionService` / `RealtimeSessionService`、`SessionHeartbeat`、`MediaService` | HTTP 与 Session 业务分离；心跳独立拥有可取消任务；模型尺寸规则集中 |
+| Service | `IApiService` / `ApiService`、`IRealtimeSessionService` / `RealtimeSessionService`、`SessionHeartbeat`、`MediaService` | HTTP 与 Session 业务分离；心跳独立拥有可取消任务；按 Core 模型配置解析尺寸建议 |
 | Media | `MediaController`、`InteractionController`、`InteractionCoordinateMapper` | 拥有本地外部流，区分断开与关闭；处理生成交互及 Fit/Fill 坐标转换 |
 | Stream | `IStreamController` / `StreamController`、`RtcRoomEvent`、`QualityController` | Xmax 房间协议、任务 ID、SEI 匹配、订阅、房间心跳、生成控制和质量事件转换 |
 | Render | `RenderController`、`XmaxVideoTexture` | 远端轨道绑定、首帧就绪、停止后帧失效；通用 I420 平面纹理上传 |
@@ -90,3 +90,5 @@ Unity 与 PICO 相机、手部追踪、权限及场景 UI 的生命周期不同�
 EditMode 测试使用 Session、Stream 和 RTC 替身，覆盖连接取消、迟到的 Session、断开合并和升级、状态监听器重入、首帧确认、条件更新、旧心跳失效、SEI 超时与故障、引擎租约、坐标、模型尺寸、JSON 响应和纹理步长。测试随 UPM 包发布，消费工程显式设置 testables 后执行。
 
 本地 CI 另行编译最小消费端并构建 Android IL2CPP/ARM64 APK，校验 RTC 原生库。测试不创建真实在线 Session；生成首帧、网络抖动、重新发布和 PICO 输入链仍需带凭据的 Android 真机联调。
+
+模型能力定义位于 `Core/Realtime/RealtimeModelCapabilities.cs`，保存固定分辨率、像素上下界、尺寸对齐和默认 Camera 规格。`MediaService` 负责尺寸推荐，Manager 在创建本地流及建立连接前检查固定分辨率；各入口共享模型配置。

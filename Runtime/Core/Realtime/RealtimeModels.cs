@@ -29,6 +29,11 @@ namespace Xmax.SDK
         public string Name { get; }
 
         /// <summary>
+        /// 内置模型的分辨率约束及默认 Camera 规格；自定义模型为 null，需显式提供编码格式。
+        /// </summary>
+        public RealtimeModelCapabilities Capabilities => RealtimeModelCapabilities.ForName(Name);
+
+        /// <summary>
         /// 创建并校验服务端模型名称。
         /// </summary>
         /// <param name="name">非空服务端模型名称，首尾空白会被移除。</param>
@@ -48,6 +53,17 @@ namespace Xmax.SDK
     /// </summary>
     public static class Models
     {
+        /// <summary>
+        /// 查询内置实时模型的分辨率约束和默认 Camera 编码规格。
+        /// </summary>
+        /// <param name="model">SDK 内置实时模型标识。</param>
+        /// <returns>指定模型的不可变共享配置。</returns>
+        /// <exception cref="ArgumentOutOfRangeException">model 不是已定义的内置模型。</exception>
+        public static RealtimeModelCapabilities GetCapabilities(this RealtimeModel model)
+        {
+            return Realtime(model).Capabilities;
+        }
+
         /// <summary>
         /// 解析内置实时模型对应的服务端名称。
         /// </summary>

@@ -35,13 +35,19 @@ namespace Xmax.SDK.Tests
         internal Func<CancellationToken, Task<XmaxSession>> Heartbeat;
         internal Func<Task> Close;
         internal int Created;
+        internal string LastModel;
         internal readonly List<string> Closed = new List<string>();
         internal static XmaxSession Session(string id = "session") => new XmaxSession
         {
             SessionUid = id, Status = "ACTIVE", JoinInfo = new RtcJoinInfo { AppId = "app", RoomId = "room", UserId = "user", Token = "token", BotName = "bot" }
         };
         public Task<XmaxSession> CreateSessionAsync(string model, CancellationToken token)
-        { Created++; return Create?.Invoke(token) ?? Task.FromResult(Session()); }
+        {
+            Created++;
+            LastModel = model;
+
+            return Create?.Invoke(token) ?? Task.FromResult(Session());
+        }
         public Task<XmaxSession> HeartbeatSessionAsync(string id, CancellationToken token)
             => Heartbeat?.Invoke(token) ?? Task.FromResult(Session(id));
         public Task CloseSessionAsync(string id, CancellationToken token)
@@ -57,9 +63,15 @@ namespace Xmax.SDK.Tests
         internal bool RejectPlatform;
         internal int Joins, Leaves, Starts, Stops, Updates, Pushes, Tracks;
         internal bool RejectUpdate;
+        internal RealtimeVideoFormat ConnectedFormat;
         public void ValidatePlatform() { if (RejectPlatform) throw new XmaxException(XmaxErrorCode.NotSupported, "Test unsupported platform."); }
         public Task ConnectAsync(RtcJoinInfo info, RealtimeVideoFormat format, CancellationToken token)
-        { Joins++; return Join?.Invoke(token) ?? Task.CompletedTask; }
+        {
+            Joins++;
+            ConnectedFormat = format;
+
+            return Join?.Invoke(token) ?? Task.CompletedTask;
+        }
         public Task DisconnectAsync() { Leaves++; return Task.CompletedTask; }
         public Task<string> StartGenerationAsync(RealtimeContext context, RealtimeVideoFormat format, CancellationToken token)
         {

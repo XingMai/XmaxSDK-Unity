@@ -54,9 +54,16 @@ namespace Xmax.SDK
         event Action<RealtimeNetworkQuality> NetworkQualityChanged;
 
         /// <summary>
+        /// 使用当前模型的默认 Camera 编码规格创建本地输入流，可在未连接时预览。
+        /// </summary>
+        /// <returns>采用模型默认宽高和帧率的本地流；宿主仍需持续推送 Camera 帧。</returns>
+        /// <exception cref="XmaxException">自定义模型没有默认规格，或当前状态不允许替换本地流。</exception>
+        RealtimeMediaStream CreateLocalExternalStream();
+
+        /// <summary>
         /// 创建或替换本地 Camera 输入流，可在未连接时预览；连接或异步操作期间不可替换。
         /// </summary>
-        /// <param name="format">本地视频编码格式，宽高须为正偶数且帧率大于零。</param>
+        /// <param name="format">本地视频编码格式，宽高须为正偶数且帧率大于零；Pro 须精确匹配固定分辨率。</param>
         /// <returns>属于此管理器的新本地流，旧本地流随即失效。</returns>
         /// <exception cref="XmaxException">编码格式无效，或当前线程、连接、操作状态不允许替换本地流。</exception>
         RealtimeMediaStream CreateLocalExternalStream(RealtimeVideoFormat format);
