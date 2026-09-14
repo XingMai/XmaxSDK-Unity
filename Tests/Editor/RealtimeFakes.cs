@@ -100,9 +100,17 @@ namespace Xmax.SDK.Tests
         internal readonly List<string> Messages = new List<string>();
         internal bool RejectSei;
         internal int Subscriptions;
+        internal VideoEncodingConfiguration? EncodingConfiguration;
         internal static RemoteStream Bot => new RemoteStream("room", "bot");
         public void ValidatePlatform() { }
-        public Task JoinAsync(RtcJoinInfo info, RealtimeVideoFormat format, CancellationToken token) => Task.CompletedTask;
+
+        public Task JoinAsync(RtcJoinInfo info, VideoEncodingConfiguration configuration, CancellationToken token)
+        {
+            EncodingConfiguration = configuration;
+
+            return Task.CompletedTask;
+        }
+
         public Task LeaveAsync() => Task.CompletedTask;
         public void SubscribeVideo(RemoteStream key) { Subscriptions++; }
         public void PushFrame(XmaxVideoFrame frame) { }

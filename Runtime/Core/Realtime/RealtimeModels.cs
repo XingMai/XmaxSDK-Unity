@@ -113,53 +113,6 @@ namespace Xmax.SDK
     }
 
     /// <summary>
-    /// 本地流的编码宽高和帧率；在创建流或连接时校验。
-    /// </summary>
-    public readonly struct RealtimeVideoFormat
-    {
-        /// <summary>
-        /// 视频宽度，单位为像素，使用时须为正偶数。
-        /// </summary>
-        public int Width { get; }
-
-        /// <summary>
-        /// 视频高度，单位为像素，使用时须为正偶数。
-        /// </summary>
-        public int Height { get; }
-
-        /// <summary>
-        /// 目标编码帧率，单位为帧每秒，使用时须大于零。
-        /// </summary>
-        public int Fps { get; }
-
-        /// <summary>
-        /// 保存视频编码尺寸和帧率。
-        /// </summary>
-        /// <param name="width">视频宽度，单位为像素。</param>
-        /// <param name="height">视频高度，单位为像素。</param>
-        /// <param name="fps">目标编码帧率，必须大于零。</param>
-        public RealtimeVideoFormat(int width, int height, int fps)
-        {
-            Width = width;
-            Height = height;
-            Fps = fps;
-        }
-
-        /// <summary>
-        /// 校验宽高为正偶数、帧率大于零。
-        /// </summary>
-        internal void Validate()
-        {
-            if (Width <= 0 || Height <= 0 || Fps <= 0 || Width % 2 != 0 || Height % 2 != 0)
-            {
-                throw new XmaxException(
-                    XmaxErrorCode.InvalidConfiguration,
-                    "Realtime video width and height must be positive even numbers, and fps must be greater than zero.");
-            }
-        }
-    }
-
-    /// <summary>
     /// 实时生成条件，包含提示词和可选的服务端参考资源路径。
     /// </summary>
     public sealed class RealtimeContext

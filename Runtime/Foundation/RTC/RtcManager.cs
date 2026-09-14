@@ -78,12 +78,12 @@ namespace Xmax.SDK
         /// 获取独占引擎租约并加入 RTC 房间，成功后发布外部视频；失败或取消时释放资源。
         /// </summary>
         /// <param name="joinInfo">经过校验的 RTC 应用、房间、用户及入房令牌。</param>
-        /// <param name="videoFormat">本地视频编码格式，宽高须为正偶数且帧率大于零。</param>
+        /// <param name="configuration">已校验并解析码率范围的完整视频编码参数。</param>
         /// <param name="cancellationToken">调用方取消令牌；取消后停止等待或撤销当前操作。</param>
         /// <returns>房间加入完成并已请求发布视频的任务。</returns>
         public async Task JoinAsync(
             RtcJoinInfo joinInfo,
-            RealtimeVideoFormat videoFormat,
+            VideoEncodingConfiguration configuration,
             CancellationToken cancellationToken)
         {
             ValidatePlatform();
@@ -109,14 +109,9 @@ namespace Xmax.SDK
                     "CreateRTCVideo");
 
                 _engine.SetVideoSourceType(StreamIndex.kStreamIndexMain, VideoSourceType.VideoSourceTypeExternal);
-                CheckResult(_engine.SetVideoEncoderConfig1(new VideoEncoderConfig
-                {
-                    Width = videoFormat.Width,
-                    Height = videoFormat.Height,
-                    FrameRate = videoFormat.Fps,
-                    MaxBitrate = EstimateBitrate(videoFormat),
-                    MinBitrate = 0
-                }), "SetVideoEncoderConfig");
+                CheckResult(
+                    _engine.SetVideoEncoderConfig1(ToRtcVideoEncoderConfig(configuration)),
+                    "SetVideoEncoderConfig");
 
                 _room = _engine.CreateRTCRoom(joinInfo.RoomId);
                 if (_room == null)
@@ -538,13 +533,38 @@ namespace Xmax.SDK
         }
 
         /// <summary>
-        /// 依据分辨率和帧率估算编码上限码率，并设置最低 300 kbps。
+        /// 将完整视频编码参数转换为厂商配置，不计算或覆盖码率。
         /// </summary>
-        /// <param name="format">本地视频编码格式，宽高须为正偶数且帧率大于零。</param>
-        /// <returns>以 kbps 为单位的编码码率。</returns>
-        private static int EstimateBitrate(RealtimeVideoFormat format)
+        /// <param name="configuration">已校验并解析默认值的编码参数。</param>
+        /// <returns>用于主视频流的厂商编码配置。</returns>
+        /// <exception cref="XmaxException">编码偏好不是 SDK 支持的枚举值。</exception>
+        internal static VideoEncoderConfig ToRtcVideoEncoderConfig(VideoEncodingConfiguration configuration)
         {
-            return Math.Max(300, (int)Math.Ceiling((double)format.Width * format.Height * format.Fps * 0.1 / 1000.0));
+            VideoEncodePreference preference;
+            switch (configuration.EncoderPreference)
+            {
+                case RealtimeVideoEncoderPreference.Auto:
+                    preference = VideoEncodePreference.kVideoEncodePreferenceBalance;
+                    break;
+                case RealtimeVideoEncoderPreference.MaintainFramerate:
+                    preference = VideoEncodePreference.kVideoEncodePreferenceFramerate;
+                    break;
+                case RealtimeVideoEncoderPreference.MaintainQuality:
+                    preference = VideoEncodePreference.kVideoEncodePreferenceQuality;
+                    break;
+                default:
+                    throw new XmaxException(XmaxErrorCode.InvalidConfiguration, "Unknown video encoder preference.");
+            }
+
+            return new VideoEncoderConfig
+            {
+                Width = configuration.Width,
+                Height = configuration.Height,
+                FrameRate = configuration.FrameRate,
+                MinBitrate = configuration.MinimumBitrate,
+                MaxBitrate = configuration.MaximumBitrate,
+                EncoderPreference = preference
+            };
         }
 
         /// <summary>

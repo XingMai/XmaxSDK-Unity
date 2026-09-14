@@ -1,7 +1,7 @@
 {
   "name": "Xmax.SDK.Tests",
   "rootNamespace": "Xmax.SDK.Tests",
-  "references": ["Xmax.SDK"],
+  "references": ["Xmax.SDK", "Xmax.VolcEngineRTC"],
   "includePlatforms": ["Editor"],
   "optionalUnityReferences": ["TestAssemblies"]
 }

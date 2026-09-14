@@ -668,13 +668,13 @@ namespace Xmax.SDK
         }
 
         /// <summary>
-        /// 校验显式编码格式及模型的固定分辨率约束，不自动改写调用方的编码尺寸。
+        /// 校验编码格式、默认码率合并结果及模型的固定分辨率约束，不改写编码尺寸。
         /// </summary>
         /// <param name="format">要用于本地流或 RTC 连接的编码格式。</param>
-        /// <exception cref="XmaxException">格式无效，或未精确匹配模型的固定分辨率。</exception>
+        /// <exception cref="XmaxException">格式或最终码率无效，或未精确匹配模型的固定分辨率。</exception>
         private void ValidateVideoFormat(RealtimeVideoFormat format)
         {
-            format.Validate();
+            EncodingController.Resolve(format);
             Options.Model.Capabilities?.ValidateResolution(format.Width, format.Height);
         }
 

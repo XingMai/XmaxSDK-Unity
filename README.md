@@ -144,6 +144,23 @@ var proLocal = proManager.CreateLocalExternalStream();
 
 默认模型仍为 `X2_0`。普通版尺寸推荐从原先默认 24 fps 调整为 30 fps；需要 24 fps 的接入方应显式传入。普通版显式 `ConnectAsync(1280, 720, 30)` 保留原尺寸，尺寸调整通过 `RecommendVideoFormat` 显式完成。外部输入帧尺寸可以与编码尺寸不同。自定义模型的 `Capabilities` 为 null，需提供明确编码规格，不套用内置模型建议或默认 Camera 规格。
 
+### 上传编码配置
+
+`RealtimeVideoFormat` 支持可选的 `MinimumBitrate`、`MaximumBitrate`（单位 kbps）和 `EncoderPreference`。未指定的码率按最终编码像素面积和帧率插值计算，表外规格按比例外推；这套计算发生在连接配置阶段，不是实时网络反馈算法。
+
+```csharp
+var format = new RealtimeVideoFormat(
+    1920, 1024, 30,
+    minimumBitrate: 0,
+    maximumBitrate: 4500,
+    encoderPreference: RealtimeVideoEncoderPreference.MaintainQuality);
+var local = proManager.CreateLocalExternalStream(format);
+```
+
+`minimumBitrate: 0` 表示不设最低码率，`null` 使用 SDK 默认值；显式最高码率必须大于零。可以只覆盖一侧，但合并默认值后最低码率不得超过最高码率，否则在创建在线 Session 前报错。默认编码偏好 `Auto` 平衡帧率和分辨率，另支持 `MaintainFramerate` 和 `MaintainQuality`。
+
+例如 `1920 × 1024 @ 30 fps` 默认配置为 `3016–6031 kbps`。原来的三参数构造及 `ConnectAsync(width, height, fps)` 仍可用，但默认码率从简单像素估算、最低为零，改为参考表计算的范围；实际发送码率取决于编码器和网络状况。
+
 交互使用 `SendTracks` 的编码像素坐标；`InteractionCoordinateMapper.TryMap` 可将 Fit/Fill 视口坐标映射为编码像素，统一采用左上角原点。Unity 屏幕坐标通常以左下角为原点，宿主应先转换 Y；相机旋转或镜像也应先反向映射。纹理上传器暴露 `Rotation`，材质的 UV 旋转、YUV 色彩转换和视觉效果由宿主处理。
 
 视频帧包装现有数组，不复制像素。调用期间不要修改输入数据；若需跨回调保留并修改帧，使用 `frame.Clone()`。长期不使用的 Manager 应调用 `CloseAsync`，纹理上传器应调用 `Dispose`。

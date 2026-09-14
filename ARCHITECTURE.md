@@ -11,7 +11,7 @@
 | Core | `XmaxClient`、`IXmaxRealtimeManager`、`XmaxRealtimeManager`、`RealtimeCoordinator`、连接和生成 Manager、错误分类 | Client 组合依赖，Realtime facade 委派业务，协调器统一操作准入、取消和清理 |
 | Service | `IApiService` / `ApiService`、`IRealtimeSessionService` / `RealtimeSessionService`、`SessionHeartbeat`、`MediaService` | HTTP 与 Session 业务分离；心跳独立拥有可取消任务；按 Core 模型配置解析尺寸建议 |
 | Media | `MediaController`、`InteractionController`、`InteractionCoordinateMapper` | 拥有本地外部流，区分断开与关闭；处理生成交互及 Fit/Fill 坐标转换 |
-| Stream | `IStreamController` / `StreamController`、`RtcRoomEvent`、`QualityController` | Xmax 房间协议、任务 ID、SEI 匹配、订阅、房间心跳、生成控制和质量事件转换 |
+| Stream | `IStreamController` / `StreamController`、`RtcRoomEvent`、`EncodingController`、`QualityController` | Xmax 房间协议、任务 ID、SEI 匹配、订阅、房间心跳、生成控制、上传编码配置和质量事件转换 |
 | Render | `RenderController`、`XmaxVideoTexture` | 远端轨道绑定、首帧就绪、停止后帧失效；通用 I420 平面纹理上传 |
 | Foundation | `IRtcManager` / `RtcManager`、`RtcEngineManager`、`RtcQualityConverter`、`XmaxLogger`、`AsyncDeadline`、`JsonCodec`、`XmaxVideoFrame`、事件派发 | 封装原生 RTC、引擎租约、质量模型、日志、超时、序列化、帧校验和回调隔离 |
 
@@ -28,6 +28,7 @@ flowchart TD
     Connection --> Stream[StreamController]
     Generation --> Stream
     Media --> Stream
+    Stream --> Encoding[EncodingController]
     Stream --> RTC[IRtcManager / RtcManager]
     RTC --> Engine[RtcEngineManager lease / VolcEngine]
     Stream --> Render[RenderController]
@@ -37,6 +38,8 @@ flowchart TD
 ```
 
 目录按职责组织，发布包仍使用 `Xmax.SDK` 单个业务程序集，避免拆程序集破坏现有消费者。原生厂商类型只出现在 `Foundation/RTC` 和 `ThirdParty`；厂商 JSON 类型只出现在 `Foundation/Serialization` 和 `ThirdParty`。Service、Stream 和 Core 通过接口及 SDK 自有模型协作。
+
+`EncodingController` 根据 `RealtimeVideoFormat` 的像素面积和帧率，对参考码率表插值或外推，再合并显式上下限。它是无状态计算组件，输出完整的 `VideoEncodingConfiguration`；`StreamController` 在入房时传递该配置，`RtcManager` 只转换厂商参数并应用。当前 RTC 引擎在入房流程内创建，因此不额外拆分一次需要引擎存活的配置调用。Manager 使用同一计算入口，在创建在线 Session 或替换本地流前检查最终码率，避免默认值合并冲突或整数溢出延迟到入房后才报错。
 
 远端流标识与 iOS 统一为 `Foundation/RTC/RemoteStream`，由房间和用户组成，表示远端主流。原生流索引的过滤与转换由 RTC 适配层负责。
 

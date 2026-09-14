@@ -48,10 +48,10 @@ namespace Xmax.SDK
         /// 获取独占引擎租约并加入 RTC 房间，成功后发布外部视频；失败或取消时释放资源。
         /// </summary>
         /// <param name="info">经过校验的 RTC 应用、房间、用户及入房令牌。</param>
-        /// <param name="format">本地视频编码格式，宽高须为正偶数且帧率大于零。</param>
+        /// <param name="configuration">已校验并解析码率范围的完整视频编码参数。</param>
         /// <param name="cancellationToken">调用方取消令牌；取消后停止等待或撤销当前操作。</param>
         /// <returns>房间加入完成并已请求发布视频的任务。</returns>
-        Task JoinAsync(RtcJoinInfo info, RealtimeVideoFormat format, CancellationToken cancellationToken);
+        Task JoinAsync(RtcJoinInfo info, VideoEncodingConfiguration configuration, CancellationToken cancellationToken);
 
         /// <summary>
         /// 取消入房等待，解除回调并尽力销毁房间、引擎和独占租约。

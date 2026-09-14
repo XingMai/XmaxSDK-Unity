@@ -96,11 +96,12 @@ namespace Xmax.SDK
             RealtimeVideoFormat format,
             CancellationToken cancellationToken)
         {
+            var encoding = EncodingController.Resolve(format);
             _info = info;
 
             try
             {
-                await _rtc.JoinAsync(info, format, cancellationToken);
+                await _rtc.JoinAsync(info, encoding, cancellationToken);
                 cancellationToken.ThrowIfCancellationRequested();
                 _roomCancellation = new CancellationTokenSource();
                 _heartbeat = RunHeartbeatAsync(_roomCancellation.Token);
