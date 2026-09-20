@@ -87,6 +87,8 @@ public sealed class XmaxHost
 
 异步致命错误通过 `ErrorOccurred` 在清理后通知，`Severity` 为 `Fatal`；直接调用失败由返回的 Task 抛出。关闭服务端 Session 失败通过 `CleanupWarning` 报告，客户端资源仍然释放。`NetworkQualityChanged` 提供与 iOS 一致的 `Uplink` / `Downlink` 质量等级，并保留丢包率、RTT 和带宽统计。
 
+`RealtimeState.Reason` 与 iOS 对齐：`Disconnected` / `Error` 终态携带进入原因，`RealtimeReason.Normal` 表示主动停止或取消，`RealtimeReason.Failure(error)` 携带导致结束的错误（与 `ErrorOccurred` 或 Task 抛出的是同一实例）；进行中的状态为 null，开始新操作时清空。眼镜平台不涉及显示方向变化，因此不提供 iOS 的方向变化原因。
+
 ## 显式本地流与通用渲染
 
 ```csharp

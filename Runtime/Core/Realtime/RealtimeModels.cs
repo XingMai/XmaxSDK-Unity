@@ -209,6 +209,89 @@ namespace Xmax.SDK
     }
 
     /// <summary>
+    /// 实时连接进入终态的原因分类。
+    /// </summary>
+    public enum RealtimeReasonKind
+    {
+        /// <summary>
+        /// 主动停止、取消或正常释放资源。
+        /// </summary>
+        Normal,
+
+        /// <summary>
+        /// 操作或运行异常导致当前流程结束。
+        /// </summary>
+        Failure
+    }
+
+    /// <summary>
+    /// 实时连接进入终态的原因；与 iOS 对齐，不包含眼镜平台不存在的方向变化原因。
+    /// </summary>
+    public sealed class RealtimeReason : IEquatable<RealtimeReason>
+    {
+        private static readonly RealtimeReason NormalInstance =
+            new RealtimeReason(RealtimeReasonKind.Normal, null);
+
+        /// <summary>
+        /// 主动停止、取消或正常释放资源的共享原因实例。
+        /// </summary>
+        public static RealtimeReason Normal => NormalInstance;
+
+        /// <summary>
+        /// 终止原因分类。
+        /// </summary>
+        public RealtimeReasonKind Kind { get; }
+
+        /// <summary>
+        /// 导致流程结束的 SDK 错误；正常终止时为 null。
+        /// </summary>
+        public XmaxException Error { get; }
+
+        private RealtimeReason(RealtimeReasonKind kind, XmaxException error)
+        {
+            Kind = kind;
+            Error = error;
+        }
+
+        /// <summary>
+        /// 创建异常终止原因。
+        /// </summary>
+        /// <param name="error">导致当前流程结束的 SDK 错误。</param>
+        /// <returns>携带错误详情的异常终止原因。</returns>
+        /// <exception cref="ArgumentNullException">error 为 null。</exception>
+        public static RealtimeReason Failure(XmaxException error)
+        {
+            if (error == null)
+                throw new ArgumentNullException(nameof(error));
+
+            return new RealtimeReason(RealtimeReasonKind.Failure, error);
+        }
+
+        /// <summary>
+        /// 按分类和错误实例比较两个终止原因。
+        /// </summary>
+        /// <param name="other">需要比较的另一个原因。</param>
+        /// <returns>分类相同且错误为同一实例时为 true。</returns>
+        public bool Equals(RealtimeReason other)
+        {
+            return other != null && Kind == other.Kind && ReferenceEquals(Error, other.Error);
+        }
+
+        /// <summary>
+        /// 按分类和错误实例比较两个终止原因。
+        /// </summary>
+        /// <param name="obj">需要比较的对象。</param>
+        /// <returns>对象为等值终止原因时为 true。</returns>
+        public override bool Equals(object obj) => Equals(obj as RealtimeReason);
+
+        /// <summary>
+        /// 返回与等值比较一致的哈希码。
+        /// </summary>
+        /// <returns>由分类和错误实例组合的哈希码。</returns>
+        public override int GetHashCode() => ((int)Kind * 397) ^ (Error?.GetHashCode() ?? 0);
+    }
+
+    /// <summary>
     /// 实时管理器状态的不可变快照。
     /// </summary>
     public sealed class RealtimeState
@@ -229,19 +312,27 @@ namespace Xmax.SDK
         public string TaskId { get; }
 
         /// <summary>
+        /// 进入终态的原因；进行中的状态为 null，开始新操作时清空。
+        /// </summary>
+        public RealtimeReason Reason { get; }
+
+        /// <summary>
         /// 创建连接状态及关联会话、任务标识的快照。
         /// </summary>
         /// <param name="connectionState">需要保存的连接或生成阶段。</param>
         /// <param name="sessionId">需要处理的服务端会话标识。</param>
         /// <param name="taskId">本次生成任务的唯一标识，用于校验任务归属。</param>
+        /// <param name="reason">进入终态的原因；进行中的状态不指定。</param>
         public RealtimeState(
             RealtimeConnectionState connectionState,
             string sessionId = null,
-            string taskId = null)
+            string taskId = null,
+            RealtimeReason reason = null)
         {
             ConnectionState = connectionState;
             SessionId = sessionId;
             TaskId = taskId;
+            Reason = reason;
         }
     }
 

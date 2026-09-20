@@ -314,16 +314,18 @@ namespace Xmax.SDK
                 if (_connection.ActiveSession != null)
                     await _connection.DisconnectAsync();
 
+                var cancelled = exception is OperationCanceledException;
+                var wrapped = cancelled ? null : RealtimeErrorHandler.Wrap(exception);
                 if (!_coordinator.IsTerminating)
-                    EmitState(new RealtimeState(exception is OperationCanceledException
-                        ? RealtimeConnectionState.Disconnected
-                        : RealtimeConnectionState.Error));
+                    EmitState(new RealtimeState(
+                        cancelled ? RealtimeConnectionState.Disconnected : RealtimeConnectionState.Error,
+                        reason: cancelled ? RealtimeReason.Normal : RealtimeReason.Failure(wrapped)));
 
                 XmaxLogger.Realtime.Failure(exception);
-                if (exception is OperationCanceledException)
+                if (cancelled)
                     throw;
 
-                throw RealtimeErrorHandler.Wrap(exception);
+                throw wrapped;
             }
         }
 
@@ -620,19 +622,27 @@ namespace Xmax.SDK
                 },
                 (target, fatal) =>
                 {
+                    var reported = fatal == null
+                        ? null
+                        : RealtimeErrorHandler.Wrap(fatal, XmaxErrorSeverity.Fatal);
+
                     if (target >= TerminationScope.Connection)
-                        EmitState(new RealtimeState(fatal == null
-                            ? RealtimeConnectionState.Disconnected
-                            : RealtimeConnectionState.Error));
+                        EmitState(reported == null
+                            ? new RealtimeState(
+                                RealtimeConnectionState.Disconnected,
+                                reason: RealtimeReason.Normal)
+                            : new RealtimeState(
+                                RealtimeConnectionState.Error,
+                                reason: RealtimeReason.Failure(reported)));
                     else if (_connection.ActiveSession != null)
                         EmitState(new RealtimeState(
                             RealtimeConnectionState.Connected,
                             _connection.ActiveSession.SessionUid));
 
-                    if (fatal != null && !fatalReported)
+                    if (reported != null && !fatalReported)
                     {
                         fatalReported = true;
-                        EventDispatch.Raise(ErrorOccurred, RealtimeErrorHandler.Wrap(fatal, XmaxErrorSeverity.Fatal));
+                        EventDispatch.Raise(ErrorOccurred, reported);
                     }
                 });
         }
@@ -697,7 +707,8 @@ namespace Xmax.SDK
         {
             if (CurrentState.ConnectionState == state.ConnectionState &&
                 CurrentState.SessionId == state.SessionId &&
-                CurrentState.TaskId == state.TaskId)
+                CurrentState.TaskId == state.TaskId &&
+                Equals(CurrentState.Reason, state.Reason))
                 return;
 
             CurrentState = state;

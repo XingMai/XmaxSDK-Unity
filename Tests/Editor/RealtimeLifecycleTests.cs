@@ -373,5 +373,58 @@ namespace Xmax.SDK.Tests
             await stop;
             Assert.AreEqual(0, count);
         });
+        [UnityTest] public IEnumerator DisconnectReportsNormalReasonAndReconnectClearsIt() => AsyncTest.Run(async () =>
+        {
+            Assert.IsNull(_manager.CurrentState.Reason);
+            await _manager.ConnectAsync(Format);
+            Assert.AreEqual(RealtimeConnectionState.Connected, _manager.CurrentState.ConnectionState);
+            Assert.IsNull(_manager.CurrentState.Reason);
+            await _manager.DisconnectAsync();
+            Assert.AreEqual(RealtimeConnectionState.Disconnected, _manager.CurrentState.ConnectionState);
+            Assert.AreEqual(RealtimeReasonKind.Normal, _manager.CurrentState.Reason.Kind);
+            Assert.IsNull(_manager.CurrentState.Reason.Error);
+            await _manager.ConnectAsync(Format);
+            Assert.AreEqual(RealtimeConnectionState.Connected, _manager.CurrentState.ConnectionState);
+            Assert.IsNull(_manager.CurrentState.Reason);
+        });
+        [UnityTest] public IEnumerator CancelledConnectReportsNormalReason() => AsyncTest.Run(async () =>
+        {
+            Task disconnect = null;
+            _manager.StateChanged += state => { if (state.ConnectionState == RealtimeConnectionState.Connecting) disconnect = _manager.DisconnectAsync(); };
+            await AsyncTest.Throws<OperationCanceledException>(_manager.ConnectAsync(Format));
+            await disconnect;
+            Assert.AreEqual(RealtimeConnectionState.Disconnected, _manager.CurrentState.ConnectionState);
+            Assert.AreEqual(RealtimeReasonKind.Normal, _manager.CurrentState.Reason.Kind);
+        });
+        [UnityTest] public IEnumerator ConnectFailureReportsFailureReasonWithThrownError() => AsyncTest.Run(async () =>
+        {
+            _stream.RejectPlatform = true;
+            XmaxException thrown = null;
+            try { await _manager.ConnectAsync(Format); }
+            catch (XmaxException exception) { thrown = exception; }
+            Assert.NotNull(thrown);
+            Assert.AreEqual(RealtimeConnectionState.Error, _manager.CurrentState.ConnectionState);
+            Assert.AreEqual(RealtimeReasonKind.Failure, _manager.CurrentState.Reason.Kind);
+            Assert.AreSame(thrown, _manager.CurrentState.Reason.Error);
+        });
+        [UnityTest] public IEnumerator FatalErrorTerminationReportsFailureReason() => AsyncTest.Run(async () =>
+        {
+            await _manager.ConnectAsync(Format);
+            XmaxException reported = null;
+            _manager.ErrorOccurred += error => reported = error;
+            _stream.Fail();
+            await _manager.DisconnectAsync();
+            Assert.AreEqual(RealtimeConnectionState.Error, _manager.CurrentState.ConnectionState);
+            Assert.AreEqual(RealtimeReasonKind.Failure, _manager.CurrentState.Reason.Kind);
+            Assert.AreEqual(XmaxErrorSeverity.Fatal, _manager.CurrentState.Reason.Error.Severity);
+            Assert.AreSame(reported, _manager.CurrentState.Reason.Error);
+        });
+        [UnityTest] public IEnumerator FailureReasonRejectsNullError() => AsyncTest.Run(() =>
+        {
+            Assert.Throws<ArgumentNullException>(() => RealtimeReason.Failure(null));
+            Assert.AreSame(RealtimeReason.Normal, RealtimeReason.Normal);
+            Assert.AreEqual(RealtimeReason.Normal, RealtimeReason.Normal);
+            return Task.CompletedTask;
+        });
     }
 }
