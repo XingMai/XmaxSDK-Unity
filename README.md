@@ -104,9 +104,10 @@ var realtime = client.CreateRealtimeManager(
     new RealtimeConfiguration(Models.Realtime(RealtimeModel.X2_0))
 );
 
-var localStream = realtime.CreateLocalExternalStream(
-    new RealtimeVideoFormat(704, 1280, 24)
-);
+// Use the model default camera format: 832×1472@30. The Pro-only
+// 1024×1920 exceeds the X2_0 pixel budget and requires
+// RealtimeModel.X2_0_Pro; see the usage guide.
+var localStream = realtime.CreateLocalExternalStream();
 
 // Start your camera pipeline and push every frame on the main thread:
 // localStream.PushVideoFrame(XmaxVideoFrame.CreateRgba(rgba, width, height));
