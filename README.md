@@ -1,196 +1,215 @@
-# XmaxSDK
+<p align="center">
+  <img src="./docs/images/brand/xmax-sdk.png" alt="XmaxSDK — Realtime Interactive Video Generation" width="880">
+</p>
 
-`ai.xmax.sdk` 是供 Xmax Unity 应用使用的实时视频 SDK。
+<p align="center">
+  <a href="https://unity.com/"><img src="https://img.shields.io/badge/Unity-6000.0%2B-000000?logo=unity" alt="Unity 6000.0+"></a>
+  <a href="https://developer.android.com/"><img src="https://img.shields.io/badge/Android-ARM64-3DDC84?logo=android" alt="Android ARM64"></a>
+  <a href="https://platform.xmaxai.com/"><img src="https://img.shields.io/badge/Realtime-AI-FF9500" alt="Realtime AI"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-4C9A2A" alt="MIT License"></a>
+</p>
 
-当前版本集成火山引擎 RTC Unity SDK 3.58.1，支持 Android（含 PICO 的 ARM64 Android 运行环境）。
+We introduce XmaxSDK, a Unity SDK designed for real-time interactive video generation via Xmax models. XmaxSDK implements an end-to-end pipeline covering media acquisition, video streaming, frame-by-frame generation, and on-device rendering, enabling developers to seamlessly integrate low-latency, high-fidelity video transformations into creative applications at a much lower cost than alternative solutions.
 
-## 职责边界
+<p align="center"><img src="./docs/images/xlab/generation-demo.gif" alt="X-Lab realtime generation demo" width="33%" /><img src="./docs/images/xlab/index-demo.gif" alt="X-Lab index demo" width="33%" /><img src="./docs/images/xlab/storage-demo.gif" alt="X-Lab storage demo" width="33%" /></p>
 
-- SDK 不依赖 PICO SDK，也不访问摄像头。
-- 当前只围绕 Camera 场景开发：宿主负责采集、处理相机画面，再以 RGBA、BGRA 或 I420 帧传给 SDK。暂不提供 Video / Image 媒体源 API。
-- SDK 负责创建 Xmax Session、加入 RTC 房间、发布宿主视频帧、订阅远端视频、生成控制、心跳和退出清理。
-- 内部按 iOS 的 Core / Service / Media / Stream / Render / Foundation 分层；详见 [架构说明](ARCHITECTURE.md)。
-- SDK 不包含文件上传或图片上传业务。
+<br>
 
-## PicoDemo 依赖
+## Why XmaxSDK?
 
-在 `PicoDemo/Packages/manifest.json` 中使用本地 UPM 依赖：
+<table>
+  <thead>
+    <tr>
+      <th height="104" align="center" valign="middle">
+        <img src="./docs/images/why/low-latency.svg" alt="Low latency" width="36" height="36"><br>Low latency
+      </th>
+      <th height="104" align="center" valign="middle">
+        <img src="./docs/images/why/low-cost.svg" alt="Cost efficiency" width="36" height="36"><br>Cost efficiency
+      </th>
+      <th height="104" align="center" valign="middle">
+        <img src="./docs/images/why/high-fidelity.svg" alt="High fidelity" width="36" height="36"><br>High fidelity
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>End-to-end latency is measured in <img src="./docs/images/why/latency-highlight.svg" alt="hundreds of milliseconds" width="192" height="20" align="absmiddle">, ensuring that updates to generation conditions and interaction controls are reflected instantly.</td>
+      <td>Run on a <img src="./docs/images/why/gpu-highlight.svg" alt="single RTX 5090" width="126" height="20" align="absmiddle">, reducing inference costs by orders of magnitude versus datacenter GPUs like H100.</td>
+      <td>Our models support real-time generation at up to <img src="./docs/images/why/resolution-highlight.svg" alt="1080p" width="48" height="20" align="absmiddle">, delivering production-ready, high-quality video output.</td>
+    </tr>
+  </tbody>
+</table>
+
+<br>
+
+## Prerequisites
+
+- Unity 6000.0 or later
+- Android build target (including the ARM64 Android runtime on PICO devices)
+- An Xmax API key
+
+> [!WARNING]
+> Never commit your Xmax API key to version control. Pass it securely at
+> runtime or use short-lived temporary keys issued by the Xmax API. For
+> step-by-step instructions, see
+> [Authentication](https://platform.xmaxai.com/docs/authentication).
+
+<br>
+
+## Installation
+
+XmaxSDK is distributed as a Unity package. Add a local UPM dependency to
+your project's `Packages/manifest.json`:
 
 ```json
 "ai.xmax.sdk": "file:../../XmaxSDK"
 ```
 
-## 最小接入示例
+To run the SDK regression tests, install `com.unity.test-framework` 1.6.0
+and add `"testables": ["ai.xmax.sdk"]`.
+
+<br>
+
+## Quick Start
+
+### Configure permissions
+
+Add a camera usage declaration to your application's Android manifest:
+
+```xml
+<uses-permission android:name="android.permission.CAMERA" />
+```
+
+Camera permissions and capture are managed by the host — the SDK never
+requests system permissions and never touches the camera itself.
+
+<br>
+
+### Generate and display video
+
+The following snippet creates a local camera stream, starts real-time
+generation, and binds the remote track to an I420 material. Create the
+manager and call its APIs on the Unity main thread:
 
 ```csharp
 using System.Threading.Tasks;
+using UnityEngine;
 using Xmax.SDK;
 
-public sealed class XmaxHost
-{
-    private XmaxRealtimeManager _realtime;
+var client = new XmaxClient(
+    new XmaxConfiguration("YOUR_XMAX_API_KEY")
+);
 
-    public async Task ConnectAsync(string apiKey)
-    {
-        _realtime = new XmaxRealtimeManager(apiKey);
+var realtime = client.CreateRealtimeManager(
+    new RealtimeConfiguration(Models.Realtime(RealtimeModel.X2_0))
+);
 
-        // 设置 RTC 编码输出尺寸；外部输入帧可以使用不同尺寸，由 RTC 内部裁切。
-        await _realtime.ConnectAsync(1280, 720, 30);
+var localStream = realtime.CreateLocalExternalStream(
+    new RealtimeVideoFormat(704, 1280, 24)
+);
 
-        _realtime.RemoteFrameReceived += remoteI420Frame =>
-        {
-            // 宿主在这里将远端 I420 帧上传到纹理或交给自己的渲染管线。
-        };
-    }
+// Start your camera pipeline and push every frame on the main thread:
+// localStream.PushVideoFrame(XmaxVideoFrame.CreateRgba(rgba, width, height));
 
-    // 由宿主自己的相机/图像处理管线逐帧调用。
-    public void PushProcessedRgba(byte[] rgba1280x1280, long timestampMicroseconds)
-    {
-        _realtime.PushRgbaFrame(
-            rgba1280x1280,
-            1280,
-            1280,
-            timestampMicroseconds,
-            1280 * 4);
-    }
+var remoteStream = await realtime.StartGenerationAsync(
+    localStream,
+    new RealtimeContext(
+        prompt: "视频中角色替换成参考图中角色",
+        referencePath: "https://platform.xmaxai.com/images/source/charx/chatx_image1.jpg"
+    )
+);
 
-    public Task StartGenerationAsync(string prompt)
-    {
-        return _realtime.StartGenerationAsync(prompt);
-    }
-
-    public Task StopGenerationAsync() => _realtime.StopGenerationAsync();
-
-    public Task DisconnectAsync() => _realtime.DisconnectAsync();
-}
-```
-
-`ConnectAsync` 和 RTC 运行只支持 Android Player；在 Unity Editor 中调用会返回 `NotSupported`。公共模型和项目脚本仍可在 Editor 中正常编译。
-
-## 生命周期与 iOS 对齐
-
-创建 Manager、调用 API 和处理事件均在 Unity 主线程执行。请 `await` 异步 API，避免使用 `.Wait()` 或 `.Result` 阻塞 Unity 主线程。
-
-- `ConnectAsync`：建立 Session 与 RTC 连接；同时只允许一个连接或生成操作，清理期间拒绝新操作。
-- `StartGenerationAsync(context)`：首次生成需要 context；等待任务 SEI 匹配和首个有效远端帧后进入 `Generating`。
-- `StartGenerationAsync(localStream, context)`：使用本 Manager 的本地流，按需连接并开始生成，返回远端流；已经连接时复用连接，正在生成时复用或更新任务。显式传入 `null` context 可复用之前成功的条件。
-- 生成中再次传入 context：更新当前任务条件；不传 context：复用当前任务，不再重启。
-- `StopGenerationAsync`：取消待完成的生成或停止当前任务，保留连接与最近成功的 context。
-- `DisconnectAsync`：取消进行中的操作，停止心跳、释放 RTC、关闭 Session；保留本地流，可继续本地预览和重新连接。
-- `CloseAsync`：完成断开并关闭本地流。旧流失效，Manager 可重新创建本地流使用。
-
-创建 Manager 和本地相机预览流不校验 API Key，也不会创建在线 Session。连接阶段才校验 Key 和服务地址。本地预览可在 Key 尚未配置时工作。
-
-一键生成的连接和生成阶段共享一次操作，期间拒绝其他连接／生成操作。连接阶段失败会清理 Session；连接成功后生成启动失败则保留连接和本地预览，便于重试。断开和关闭仍可取消整个操作。
-
-连接清理时会发出新增状态 `Disconnecting`。重复断开共享同一清理任务；旧操作完成后不会覆盖新连接。`StateChanged` 监听器抛出的异常不会中断 SDK 清理，开启业务日志后会记录其错误类型。
-
-异步致命错误通过 `ErrorOccurred` 在清理后通知，`Severity` 为 `Fatal`；直接调用失败由返回的 Task 抛出。关闭服务端 Session 失败通过 `CleanupWarning` 报告，客户端资源仍然释放。`NetworkQualityChanged` 提供与 iOS 一致的 `Uplink` / `Downlink` 质量等级，并保留丢包率、RTT 和带宽统计。
-
-`RealtimeState.Reason` 与 iOS 对齐：`Disconnected` / `Error` 终态携带进入原因，`RealtimeReason.Normal` 表示主动停止或取消，`RealtimeReason.Failure(error)` 携带导致结束的错误（与 `ErrorOccurred` 或 Task 抛出的是同一实例）；进行中的状态为 null，开始新操作时清空。眼镜平台不涉及显示方向变化，因此不提供 iOS 的方向变化原因。
-
-## 显式本地流与通用渲染
-
-```csharp
-var client = new XmaxClient(new XmaxConfiguration(apiKey, XmaxEnvironment.China));
-IXmaxRealtimeManager manager = client.CreateRealtimeManager(
-    new RealtimeConfiguration(Models.Realtime(RealtimeModel.X2_0)));
-var format = client.CreateMediaService().RecommendVideoFormat(
-    Models.Realtime(RealtimeModel.X2_0), 1920, 1080);
-var local = manager.CreateLocalExternalStream(format);
-local.VideoTrack.FrameReceived += frame => { /* 可选本地预览 */ };
-
-// 先启动宿主相机，每帧在 Unity 主线程调用：
-// local.PushVideoFrame(XmaxVideoFrame.CreateRgba(rgba, width, height));
-// 相机必须在等待生成期间持续送帧。
-var remote = await manager.StartGenerationAsync(local,
-    new RealtimeContext("A watercolor landscape"));
-
-// i420Material 的 shader 需采样 _YTex、_UTex、_VTex。
-// 可复用宿主的 PICO 门户材质；SDK 负责步长处理、纹理上传和尺寸变化。
+// The shader of i420Material must sample _YTex, _UTex, and _VTex; the SDK
+// handles strides, texture upload, and size changes.
 var texture = new XmaxVideoTexture();
-texture.Bind(remote.VideoTrack, i420Material);
-
-// 后续显式 context 更新当前任务，null 复用当前任务。
-await manager.StartGenerationAsync(local, null);
-await manager.CloseAsync();
-texture.Dispose();
+texture.Bind(remoteStream.VideoTrack, i420Material);
 ```
 
-模型配置与 iOS 对齐，由 `RealtimeModel.GetCapabilities()`、`ModelDefinition.Capabilities` 或 `MediaService.GetCapabilities()` 读取同一份不可变配置。
+`ConnectAsync` and RTC only run on Android Player; calling them in the Unity
+Editor returns `NotSupported`. Local camera preview does not require a valid
+API key — the key and service URL are validated at connect time.
 
-| 配置 | `X2_0` | `X2_0_Pro` |
-| --- | --- | --- |
-| 服务端名称 | `x2.0` | `x2.0-pro` |
-| 固定分辨率 `ResolutionBuckets` | 空，按像素范围与对齐规则推荐 | 1024×1920、1920×1024 |
-| 像素下界 `MinimumPixels` | 600,000 | 600,000 |
-| 像素上界 `MaximumPixels` | 1,280,000 | 2,100,000 |
-| 尺寸对齐 `DimensionAlignment` | 32 | 32 |
-| 默认帧率 `DefaultFps` | 30 fps | 30 fps |
-| 默认 Camera 规格 `DefaultCameraVideoFormat` | 832×1472@30 | 1024×1920@30 |
+<br>
 
-固定分辨率列表非空时，宽高必须精确匹配，像素上下界和对齐参数不参与自动缩放。Pro 的尺寸推荐、本地流创建和连接入口都会拒绝其他尺寸，且在创建在线 Session 前完成校验。`RecommendVideoFormat` 的 `fps = 0` 使用模型默认帧率，显式正帧率会保留；直接传入 `RealtimeVideoFormat` 时帧率仍须大于零。
+### Listen for events
+
+After creating `realtime`, register the listeners you need before creating
+the input stream or starting generation.
+
+| Listener | Purpose |
+| --- | --- |
+| `StateChanged` | Observe connection and generation states; the `Disconnected` / `Error` terminal states carry a termination `Reason`. |
+| `RemoteFrameReceived` | Receive generated frames for recording or custom processing. |
+| `NetworkQualityChanged` | Monitor uplink and downlink network quality. |
+
+For example, monitor state changes and termination reasons:
 
 ```csharp
-var model = RealtimeModel.X2_0_Pro;
-var capabilities = model.GetCapabilities();
-IXmaxRealtimeManager proManager = client.CreateRealtimeManager(
-    new RealtimeConfiguration(Models.Realtime(model)));
-
-// 使用模型默认规格：1024×1920@30。
-var proLocal = proManager.CreateLocalExternalStream();
-// 宿主仍负责采集 Camera，并持续向 proLocal 推帧。
-// 需要横屏时可在未连接状态创建：
-// proManager.CreateLocalExternalStream(new RealtimeVideoFormat(1920, 1024, 30));
+realtime.StateChanged += state =>
+{
+    Debug.Log($"State: {state.ConnectionState}");
+    if (state.Reason?.Kind == RealtimeReasonKind.Failure)
+        Debug.Log($"Ended with {state.Reason.Error.Code}: {state.Reason.Error.Message}");
+};
 ```
 
-默认模型仍为 `X2_0`。普通版尺寸推荐从原先默认 24 fps 调整为 30 fps；需要 24 fps 的接入方应显式传入。普通版显式 `ConnectAsync(1280, 720, 30)` 保留原尺寸，尺寸调整通过 `RecommendVideoFormat` 显式完成。外部输入帧尺寸可以与编码尺寸不同。自定义模型的 `Capabilities` 为 null，需提供明确编码规格，不套用内置模型建议或默认 Camera 规格。
+Handle errors thrown by async calls with `try/catch`. Failures that end the
+realtime workflow are reported through `ErrorOccurred` after cleanup
+completes, sharing the same error instance as the terminal state's `Reason`;
+server session close failures are reported as recoverable `CleanupWarning`
+events.
 
-### 上传编码配置
+<br>
 
-`RealtimeVideoFormat` 支持可选的 `MinimumBitrate`、`MaximumBitrate`（单位 kbps）和 `EncoderPreference`。未指定的码率按最终编码像素面积和帧率插值计算，表外规格按比例外推；这套计算发生在连接配置阶段，不是实时网络反馈算法。
+### Resource Cleanup
 
-```csharp
-var format = new RealtimeVideoFormat(
-    1920, 1024, 30,
-    minimumBitrate: 0,
-    maximumBitrate: 4500,
-    encoderPreference: RealtimeVideoEncoderPreference.MaintainQuality);
-var local = proManager.CreateLocalExternalStream(format);
-```
+- **`DisconnectAsync` — Stop Remote Generation**
 
-`minimumBitrate: 0` 表示不设最低码率，`null` 使用 SDK 默认值；显式最高码率必须大于零。可以只覆盖一侧，但合并默认值后最低码率不得超过最高码率，否则在创建在线 Session 前报错。默认编码偏好 `Auto` 平衡帧率和分辨率，另支持 `MaintainFramerate` 和 `MaintainQuality`。
+  Stops remote generation and tears down RTC and the server session (stops
+  billing) while keeping the local camera stream and preview active. Use
+  this when ending the online session but staying on the current screen. You
+  can start a new session later using the same local stream:
 
-例如 `1920 × 1024 @ 30 fps` 默认配置为 `3016–6031 kbps`。原来的三参数构造及 `ConnectAsync(width, height, fps)` 仍可用，但默认码率从简单像素估算、最低为零，改为参考表计算的范围；实际发送码率取决于编码器和网络状况。
+  ```csharp
+  await realtime.DisconnectAsync();
+  ```
 
-交互使用 `SendTracks` 的编码像素坐标；`InteractionCoordinateMapper.TryMap` 可将 Fit/Fill 视口坐标映射为编码像素，统一采用左上角原点。Unity 屏幕坐标通常以左下角为原点，宿主应先转换 Y；相机旋转或镜像也应先反向映射。纹理上传器暴露 `Rotation`，材质的 UV 旋转、YUV 色彩转换和视觉效果由宿主处理。
+- **`CloseAsync` — Full Teardown & Release**
 
-视频帧包装现有数组，不复制像素。调用期间不要修改输入数据；若需跨回调保留并修改帧，使用 `frame.Clone()`。长期不使用的 Manager 应调用 `CloseAsync`，纹理上传器应调用 `Dispose`。
+  Ends the remote session, invalidates the local stream, and releases all
+  engine resources. Use this when leaving or dismissing the generation
+  screen:
 
-## 质量与日志
+  ```csharp
+  await realtime.CloseAsync();
+  ```
 
-```csharp
-var configuration = new XmaxConfiguration(apiKey, XmaxEnvironment.China,
-    XmaxLoggerOption.Business | XmaxLoggerOption.Performance);
-var client = new XmaxClient(configuration);
-var manager = client.CreateRealtimeManager(
-    new RealtimeConfiguration(Models.Realtime(RealtimeModel.X2_0)));
-manager.NetworkQualityChanged += quality =>
-    UnityEngine.Debug.Log($"Up: {quality.Uplink}, Down: {quality.Downlink}");
-```
+> **Note:** These methods are alternatives, not sequential steps. When
+> exiting a screen, call `CloseAsync` directly — there is no need to call
+> `DisconnectAsync` first.
 
-日志选项与 iOS 一致：`None`（默认关闭）、`Business`（API、连接、生成和错误）、`Performance`（网络质量和启动耗时）、`All`。配置为 SDK 全局选项，仅在 Client 初始化时更新；从已有 Client 创建 Manager 不会覆盖较新 Client 的配置。直接使用 `new XmaxRealtimeManager(...)` 的兼容入口会创建一个 Client 来应用配置。第三方 RTC 和 Unity 自身的日志不受此开关控制，日志开关不影响错误事件或 Task 异常。
+<br>
 
-内部调用与 iOS 的分类实例对应，例如 `XmaxLogger.Realtime.Info(() => "Connected")`、`XmaxLogger.Rtc.Warn(() => "Limited", XmaxLoggerOption.Performance)`。`Debug / Info / Warn / Error` 均支持相同的分类选项和延迟消息求值。Unity Console 的 Debug 和 Info 均输出为普通 Log，Warn 和 Error 分别输出为 Warning 和 Error。
+> [!TIP]
+> For complete usage examples, including explicit local streams, encoding
+> configuration, interaction coordinates, and logging options, see the
+> [usage guide](./docs/usage.md).
 
-启动耗时使用单调时钟，覆盖 Session 创建、RTC 进房、连接、开始信令、SEI 匹配和首帧就绪；失败记录停留阶段，更新已运行任务不会重复计算启动耗时。直接连接后再生成只统计生成阶段，一键生成包含连接阶段。
+<br>
 
-API 日志只输出请求方法、路由模板、HTTP 状态、耗时和响应字节数。不会输出 API Key、Token、Session ID、prompt、响应正文或任意异常正文。
+## Dependencies
 
-质量等级包含 `Unknown / Excellent / Good / Poor / Bad / VeryBad / Down`。当前 Unity RTC 包定义到 `VeryBad`，未知厂商值映射为 `Unknown`，不推测 `Down`；该包也未暴露 iOS 的性能限制／恢复告警回调，因此当前未提供性能告警事件。
+- <ins><strong>VolcEngine RTC SDK for Unity 3.58.1</strong></ins> enables low-latency, real-time audio and video communication.
 
-## 测试
+<br>
 
-`Tests/Editor` 包含无需真实 API key 或 RTC 设备的回归测试。消费工程安装 `com.unity.test-framework` 1.6.0，并在 `Packages/manifest.json` 添加 `"testables": ["ai.xmax.sdk"]` 后，可以通过 Unity Test Runner 的 EditMode 执行。
+## Contact us
 
-本地 `.cicd/validate.sh` 自动运行这些测试、最小消费端 Editor 检查和 Android IL2CPP/ARM64 构建。真实 RTC 收发、PICO 相机输入和网络重连仍需真机联调。
+For integration assistance and technical support, contact us at
+[sdk@xmax.ai](mailto:sdk@xmax.ai).
+
+<br>
+
+## License
+
+XmaxSDK is available under the terms of the [MIT License](LICENSE).
